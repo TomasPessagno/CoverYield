@@ -420,7 +420,7 @@ def main():
     options_df = cached['options_df']
     scan_time = cached.get('scan_time', '')
     
-    scan_time_html = f"<span style='font-size: 0.9rem; color: #64748b; margin-left: 15px; font-weight: 400;'>Scanned: {scan_time}</span>" if scan_time else ""
+    scan_time_html = f"<span style='font-size: 1.1rem; color: #64748b; margin-left: 15px; font-weight: 400;'>Scanned: {scan_time}</span>" if scan_time else ""
 
     # Transform/filter the data (runs on every rerender so layout changes apply)
     filtered_df = transform_data(
@@ -468,12 +468,12 @@ def main():
         arrow = "▼" if day_change < 0 else "▲"
         
         st.markdown(
-            css_injection + f"\n<div id='sticky-ticker-bar' style='padding: 10px 20px; border-radius: 8px; background-color: rgba(248, 250, 252, 0.95); backdrop-filter: blur(5px); border: 1px solid #e2e8f0; margin-bottom: 15px; display: inline-block; width: 100%; box-shadow: 0 4px 10px rgba(0,0,0,0.08); margin-top: 5px;'>\n<span style='font-size: 1.2rem; font-weight: 700; margin-right: 20px;'>{ticker}</span>\n<span style='font-size: 1.1rem; margin-right: 15px; font-weight: 500;'>${current_price:.2f}</span>\n<span style='color: {color}; font-weight: 600;'>{arrow} ${abs(day_change):.2f} ({day_change_pct:+.2f}%) Today</span>{scan_time_html}\n</div>",
+            css_injection + f"\n<div id='sticky-ticker-bar' style='padding: 15px 25px; border-radius: 8px; background-color: rgba(248, 250, 252, 0.95); backdrop-filter: blur(5px); border: 1px solid #e2e8f0; margin-bottom: 15px; display: inline-block; width: 100%; box-shadow: 0 4px 10px rgba(0,0,0,0.08); margin-top: 5px;'>\n<span style='font-size: 1.8rem; font-weight: 700; margin-right: 20px;'>{ticker}</span>\n<span style='font-size: 1.5rem; margin-right: 15px; font-weight: 500;'>${current_price:.2f}</span>\n<span style='font-size: 1.2rem; color: {color}; font-weight: 600;'>{arrow} ${abs(day_change):.2f} ({day_change_pct:+.2f}%) Today</span>{scan_time_html}\n</div>",
             unsafe_allow_html=True
         )
     else:
         st.markdown(
-            css_injection + f"\n<div id='sticky-ticker-bar' style='padding: 10px 20px; border-radius: 8px; background-color: rgba(248, 250, 252, 0.95); backdrop-filter: blur(5px); border: 1px solid #e2e8f0; margin-bottom: 15px; display: inline-block; width: 100%; box-shadow: 0 4px 10px rgba(0,0,0,0.08); margin-top: 5px;'>\n<span style='font-size: 1.2rem; font-weight: 700; margin-right: 20px;'>{ticker}</span>\n<span style='font-size: 1.1rem; font-weight: 500;'>${current_price:.2f}</span>{scan_time_html}\n</div>",
+            css_injection + f"\n<div id='sticky-ticker-bar' style='padding: 15px 25px; border-radius: 8px; background-color: rgba(248, 250, 252, 0.95); backdrop-filter: blur(5px); border: 1px solid #e2e8f0; margin-bottom: 15px; display: inline-block; width: 100%; box-shadow: 0 4px 10px rgba(0,0,0,0.08); margin-top: 5px;'>\n<span style='font-size: 1.8rem; font-weight: 700; margin-right: 20px;'>{ticker}</span>\n<span style='font-size: 1.5rem; font-weight: 500;'>${current_price:.2f}</span>{scan_time_html}\n</div>",
             unsafe_allow_html=True
         )
 
@@ -482,6 +482,7 @@ def main():
     # ------------------------------------------------------------------
 
     st.markdown("### Filtered Options Chain")
+    st.markdown("<p style='text-align: left; font-style: italic; font-size: 0.85rem; color: #888; padding-bottom: 5px; margin-top: -10px; margin-bottom: 10px;'>*Hover over the interrogation (?) icons or the column headers to know more about them.*</p>", unsafe_allow_html=True)
 
     # Real-time strike offset filters (filters already-loaded data, no re-fetch)
     offset_col1, offset_col2 = st.columns(2)
@@ -576,8 +577,17 @@ def main():
         filtered_df.get('impliedVolatility', pd.Series(dtype=float)), errors='coerce'
     ).fillna(0) * 100  # Convert to percentage
 
+    # Create the specific contract link using the OCC contractSymbol column
+    filtered_df['Yahoo Contract'] = "https://finance.yahoo.com/quote/" + filtered_df['contractSymbol']
+
+    # Keep Robinhood routing to the main ticker page since they don't support contract deep-links
+    filtered_df['Robinhood'] = "https://robinhood.com/stocks/" + filtered_df['Ticker']
+    filtered_df['TradingView'] = "https://www.tradingview.com/symbols/" + filtered_df['Ticker'] + "/"
+
     display_columns = [
-        'Ticker',
+        'Yahoo Contract',
+        'Robinhood',
+        'TradingView',
         'Strike Display',
         'Distance to Strike %',
         'Days to Expiry',
@@ -599,7 +609,7 @@ def main():
     display_df = filtered_df[display_columns].copy()
 
     if 'expirationDate' in display_df.columns:
-        display_df['expirationDate'] = display_df['expirationDate'].dt.date
+        display_df['expirationDate'] = display_df['expirationDate'].dt.strftime('%b %d')
 
 
     styled_df = display_df.style
@@ -607,9 +617,9 @@ def main():
     def format_dte_bar(val: float) -> str:
         if pd.isna(val): return ""
         ratio = min(max(val / max_days, 0), 1) if max_days > 0 else 0
-        filled = int(ratio * 12)
+        filled = int(ratio * 6)
         # Using a sleek minimalist wireframe track since raw text cannot be individually colored
-        return f"{val:2.0f}   {'█' * filled}{'─' * (12 - filled)}"
+        return f"{val:.0f}   {'█' * filled}{'─' * (6 - filled)}"
 
     # Format numeric columns
     format_map = {
@@ -680,16 +690,17 @@ def main():
             oi_safe = df['Open Interest'].replace({0: 1, 0.0: 1})
             ratio = (df['Volume'] / oi_safe).clip(0, 1)
             
-            # White to dark gray (55, 65, 81)
-            r = (255 - (255 - 55) * ratio).astype(int)
-            g = (255 - (255 - 65) * ratio).astype(int)
-            b = (255 - (255 - 81) * ratio).astype(int)
+            # White to even lighter dark gray (148, 163, 184)
+            r = (255 - (255 - 148) * ratio).astype(int)
+            g = (255 - (255 - 163) * ratio).astype(int)
+            b = (255 - (255 - 184) * ratio).astype(int)
             
-            text_colors = ['#fff' if val > 0.6 else '#000' for val in ratio]
+            # Use strict black text since the background is now solidly light
+            text_colors = ['#000' for val in ratio]
             vol_styles = [f'background-color: rgb({r.iloc[i]},{g.iloc[i]},{b.iloc[i]}); color: {text_colors[i]}' for i in range(len(ratio))]
             
             styles['Volume'] = vol_styles
-            styles['Open Interest'] = 'background-color: #f1f5f9; color: #000'
+            styles['Open Interest'] = 'background-color: rgb(148, 163, 184); color: #000'
         return styles
 
     # ---------- Apply per-column with absolute boundaries ----------
@@ -718,33 +729,112 @@ def main():
     if 'Volume' in display_df.columns and 'Open Interest' in display_df.columns:
         styled_df = styled_df.apply(vol_oi_heatmap, axis=None, subset=['Volume', 'Open Interest'])
 
-    # Rename columns for display
-    column_labels = {
-        'Strike Display': 'Strike',
-        'Distance to Strike %': 'Distance to Strike %',
-        'Days to Expiry': 'Days to Expiry',
-        'expirationDate': 'Expiration Date',
-        'BidPrice': 'Premium (Bid)',
-        'MidPrice': 'Mid Price',
-        'AskPrice': 'Ask',
-        'Spread': 'Bid-Ask Spread',
-        'Breakeven Price': 'Breakeven Price',
-        'Static Return %': 'Static Return %',
-        'Annualized Return %': 'Annualized Return %',
-        'Volume': 'Volume',
-        'Open Interest': 'Open Interest',
-        'IV': 'Implied Volatility (IV)',
-    }
-    active_labels = {k: v for k, v in column_labels.items() if k in display_df.columns}
-    styled_df = styled_df.relabel_index(
-        [active_labels.get(c, c) for c in display_df.columns],
-        axis=1
-    )
+    # The physical st.dataframe configuration block automatically handles all column renaming!
+    # --- Table zoom slider ---
+    _, slider_col, _ = st.columns([3, 4, 3])
+    with slider_col:
+        st.markdown("<div style='text-align:center; font-size:0.75rem; font-weight:600; color:#555; margin-bottom:0;'>Table Size</div>", unsafe_allow_html=True)
+        min_col, mid_col, max_col = st.columns([1, 8, 1])
+        min_col.markdown("<div style='text-align:center; font-size:0.7rem; color:#aaa; padding-top:4px;'>Min</div>", unsafe_allow_html=True)
+        max_col.markdown("<div style='text-align:center; font-size:0.7rem; color:#aaa; padding-top:4px;'>Max</div>", unsafe_allow_html=True)
+        with mid_col:
+            table_scale_pct = st.slider(
+                "Table Size", min_value=60, max_value=140, value=100, step=5,
+                format="%d%%", key="table_scale_slider", label_visibility="collapsed"
+            )
+    table_scale = table_scale_pct / 100
+
+    # Scale the canvas from center — does not affect Streamlit's internal render math
+    st.markdown(f"""
+        <style>
+        div[data-testid="stDataFrame"] > div {{
+            transform: scale({table_scale});
+            transform-origin: top center;
+            margin-left: auto;
+            margin-right: auto;
+        }}
+        </style>
+    """, unsafe_allow_html=True)
 
     st.dataframe(
         styled_df,
+        height=450,
         use_container_width=True,
         hide_index=True,
+        column_config={
+            "Yahoo Contract": st.column_config.LinkColumn(
+                "Links", 
+                display_text="YC",
+                help="Direct deep-link to the exact OCC options contract chain on Yahoo Finance."
+            ),
+            "Robinhood": st.column_config.LinkColumn(
+                "Links", 
+                display_text="RH",
+                help="Deep-link directly to the ticker's main trade execution screen on Robinhood."
+            ),
+            "TradingView": st.column_config.LinkColumn(
+                "Links", 
+                display_text="TV",
+                help="View the ticker's advanced graphing interface and indicators on TradingView."
+            ),
+            "Strike Display": st.column_config.Column(
+                "Strike",
+                help="The predefined price at which the underlying asset can be bought or sold."
+            ),
+            "Distance to Strike %": st.column_config.Column(
+                "Distance to Strike %",
+                help="The percentage difference between the underlying asset's current market price and the strike price."
+            ),
+            "Days to Expiry": st.column_config.Column(
+                "Days to Expiry",
+                help="The number of calendar days remaining until the contract matures."
+            ),
+            "expirationDate": st.column_config.Column(
+                "Expiration",
+                width="small",
+                help="The specific date on which the contract matures and becomes invalid."
+            ),
+            "BidPrice": st.column_config.Column(
+                "Premium (Bid)",
+                help="The highest price currently offered by buyers in the market."
+            ),
+            "MidPrice": st.column_config.Column(
+                "Mid Price",
+                help="The calculated average between the current Bid and Ask prices."
+            ),
+            "AskPrice": st.column_config.Column(
+                "Ask",
+                help="The lowest price currently accepted by sellers in the market."
+            ),
+            "Spread": st.column_config.Column(
+                "Bid-Ask Spread",
+                help="The difference between the Ask and Bid prices, serving as an indicator of market liquidity."
+            ),
+            "Breakeven Price": st.column_config.Column(
+                "Breakeven Price",
+                help="The price the underlying asset must reach at expiration for the position to result in a net-zero profit or loss."
+            ),
+            "Static Return %": st.column_config.Column(
+                "Static Return %",
+                help="The projected percentage return if the underlying asset's price remains completely unchanged through expiration."
+            ),
+            "Annualized Return %": st.column_config.Column(
+                "Annualized Return %",
+                help="The return percentage extrapolated over a 12-month period, used to standardize and compare yields across different timeframes."
+            ),
+            "Volume": st.column_config.Column(
+                "Volume",
+                help="The total number of contracts transacted during the current trading period."
+            ),
+            "Open Interest": st.column_config.Column(
+                "Open Interest",
+                help="The total number of active, outstanding contracts currently held by market participants."
+            ),
+            "IV": st.column_config.Column(
+                "Implied Volatility (IV)",
+                help="A quantitative measure representing the market's expectation of future price fluctuations for the underlying asset."
+            )
+        }
     )
 
     # ------------------------------------------------------------------
