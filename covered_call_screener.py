@@ -8,7 +8,6 @@ This app screens call options for covered call strategies by:
 3. Filtering for OTM / near-ATM calls
 4. Computing static return percentages
 5. Displaying filtered options that meet minimum return criteria
-
 Author: Tomas Pessagno
 """
 
@@ -730,21 +729,26 @@ def main():
         styled_df = styled_df.apply(vol_oi_heatmap, axis=None, subset=['Volume', 'Open Interest'])
 
     # The physical st.dataframe configuration block automatically handles all column renaming!
-    # --- Table zoom slider ---
-    _, slider_col, _ = st.columns([3, 4, 3])
+    # --- Table zoom slider + compact toggle ---
+    _, slider_col, check_col = st.columns([3, 4, 2])
     with slider_col:
-        st.markdown("<div style='text-align:center; font-size:0.75rem; font-weight:600; color:#555; margin-bottom:0;'>Table Size</div>", unsafe_allow_html=True)
         min_col, mid_col, max_col = st.columns([1, 8, 1])
         min_col.markdown("<div style='text-align:center; font-size:0.7rem; color:#aaa; padding-top:4px;'>Min</div>", unsafe_allow_html=True)
         max_col.markdown("<div style='text-align:center; font-size:0.7rem; color:#aaa; padding-top:4px;'>Max</div>", unsafe_allow_html=True)
         with mid_col:
             table_scale_pct = st.slider(
                 "Table Size", min_value=60, max_value=140, value=100, step=5,
-                format="%d%%", key="table_scale_slider", label_visibility="collapsed"
+                format="%d%%", key="table_scale_slider",
+                help="If not all columns are visible on your screen, use your browser's zoom: Ctrl + (−) to zoom out, Ctrl + (+) to zoom in. On Mac, use ⌘ instead of Ctrl."
             )
+    with check_col:
+        st.markdown("<div style='font-size:0.75rem; font-weight:600; color:#555; margin-bottom:2px; margin-top:4px;'>Compact Columns</div>", unsafe_allow_html=True)
+        compact_cols = st.checkbox("Compact", value=False, key="compact_cols_toggle", label_visibility="collapsed")
     table_scale = table_scale_pct / 100
+    link_width = 50 if compact_cols else None
+    col_width = 75 if compact_cols else None
 
-    # Scale the canvas from center — does not affect Streamlit's internal render math
+    # CSS zoom had left-alignment issues — transform: scale keeps things centered
     st.markdown(f"""
         <style>
         div[data-testid="stDataFrame"] > div {{
@@ -756,85 +760,71 @@ def main():
         </style>
     """, unsafe_allow_html=True)
 
+    if compact_cols:
+        col_cfg = {
+            "Yahoo Contract": st.column_config.LinkColumn(
+                "Y", display_text="YC", width=30,
+                help="Direct deep-link to the exact OCC options contract chain on Yahoo Finance."
+            ),
+            "Robinhood": st.column_config.LinkColumn(
+                "R", display_text="RH", width=30,
+                help="Deep-link directly to the ticker's main trade execution screen on Robinhood."
+            ),
+            "TradingView": st.column_config.LinkColumn(
+                "T", display_text="TV", width=30,
+                help="View the ticker's advanced graphing interface and indicators on TradingView."
+            ),
+            "Strike Display": st.column_config.Column("Strike", width=100, help="The predefined price at which the underlying asset can be bought or sold."),
+            "Distance to Strike %": st.column_config.Column("Dist %", width=50, help="The percentage difference between the underlying asset's current market price and the strike price."),
+            "Days to Expiry": st.column_config.Column("DTE", width=85, help="The number of calendar days remaining until the contract matures."),
+            "expirationDate": st.column_config.Column("Exp", width=55, help="The specific date on which the contract matures and becomes invalid."),
+            "BidPrice": st.column_config.Column("Bid", width=50, help="The highest price currently offered by buyers in the market."),
+            "MidPrice": st.column_config.Column("Mid", width=50, help="The calculated average between the current Bid and Ask prices."),
+            "AskPrice": st.column_config.Column("Ask", width=50, help="The lowest price currently accepted by sellers in the market."),
+            "Spread": st.column_config.Column("Spread", width=50, help="The difference between the Ask and Bid prices, serving as an indicator of market liquidity."),
+            "Breakeven Price": st.column_config.Column("B/E", width=50, help="The price the underlying asset must reach at expiration for the position to result in a net-zero profit or loss."),
+            "Static Return %": st.column_config.Column("Static %", width=50, help="The projected percentage return if the underlying asset's price remains completely unchanged through expiration."),
+            "Annualized Return %": st.column_config.Column("Ann %", width=50, help="The return percentage extrapolated over a 12-month period, used to standardize and compare yields across different timeframes."),
+            "Volume": st.column_config.Column("Vol", width=40, help="The total number of contracts transacted during the current trading period."),
+            "Open Interest": st.column_config.Column("OI", width=40, help="The total number of active, outstanding contracts currently held by market participants."),
+            "IV": st.column_config.Column("IV", width=40, help="A quantitative measure representing the market's expectation of future price fluctuations for the underlying asset."),
+        }
+    else:
+        col_cfg = {
+            "Yahoo Contract": st.column_config.LinkColumn(
+                "Links", display_text="YC",
+                help="Direct deep-link to the exact OCC options contract chain on Yahoo Finance."
+            ),
+            "Robinhood": st.column_config.LinkColumn(
+                "Links", display_text="RH",
+                help="Deep-link directly to the ticker's main trade execution screen on Robinhood."
+            ),
+            "TradingView": st.column_config.LinkColumn(
+                "Links", display_text="TV",
+                help="View the ticker's advanced graphing interface and indicators on TradingView."
+            ),
+            "Strike Display": st.column_config.Column("Strike", help="The predefined price at which the underlying asset can be bought or sold."),
+            "Distance to Strike %": st.column_config.Column("Distance to Strike %", help="The percentage difference between the underlying asset's current market price and the strike price."),
+            "Days to Expiry": st.column_config.Column("Days to Expiry", help="The number of calendar days remaining until the contract matures."),
+            "expirationDate": st.column_config.Column("Expiration", width="small", help="The specific date on which the contract matures and becomes invalid."),
+            "BidPrice": st.column_config.Column("Premium (Bid)", help="The highest price currently offered by buyers in the market."),
+            "MidPrice": st.column_config.Column("Mid Price", help="The calculated average between the current Bid and Ask prices."),
+            "AskPrice": st.column_config.Column("Ask", help="The lowest price currently accepted by sellers in the market."),
+            "Spread": st.column_config.Column("Bid-Ask Spread", help="The difference between the Ask and Bid prices, serving as an indicator of market liquidity."),
+            "Breakeven Price": st.column_config.Column("Breakeven Price", help="The price the underlying asset must reach at expiration for the position to result in a net-zero profit or loss."),
+            "Static Return %": st.column_config.Column("Static Return %", help="The projected percentage return if the underlying asset's price remains completely unchanged through expiration."),
+            "Annualized Return %": st.column_config.Column("Annualized Return %", help="The return percentage extrapolated over a 12-month period, used to standardize and compare yields across different timeframes."),
+            "Volume": st.column_config.Column("Volume", help="The total number of contracts transacted during the current trading period."),
+            "Open Interest": st.column_config.Column("Open Interest", help="The total number of active, outstanding contracts currently held by market participants."),
+            "IV": st.column_config.Column("Implied Volatility (IV)", help="A quantitative measure representing the market's expectation of future price fluctuations for the underlying asset."),
+        }
+
     st.dataframe(
         styled_df,
         height=450,
         use_container_width=True,
         hide_index=True,
-        column_config={
-            "Yahoo Contract": st.column_config.LinkColumn(
-                "Links", 
-                display_text="YC",
-                help="Direct deep-link to the exact OCC options contract chain on Yahoo Finance."
-            ),
-            "Robinhood": st.column_config.LinkColumn(
-                "Links", 
-                display_text="RH",
-                help="Deep-link directly to the ticker's main trade execution screen on Robinhood."
-            ),
-            "TradingView": st.column_config.LinkColumn(
-                "Links", 
-                display_text="TV",
-                help="View the ticker's advanced graphing interface and indicators on TradingView."
-            ),
-            "Strike Display": st.column_config.Column(
-                "Strike",
-                help="The predefined price at which the underlying asset can be bought or sold."
-            ),
-            "Distance to Strike %": st.column_config.Column(
-                "Distance to Strike %",
-                help="The percentage difference between the underlying asset's current market price and the strike price."
-            ),
-            "Days to Expiry": st.column_config.Column(
-                "Days to Expiry",
-                help="The number of calendar days remaining until the contract matures."
-            ),
-            "expirationDate": st.column_config.Column(
-                "Expiration",
-                width="small",
-                help="The specific date on which the contract matures and becomes invalid."
-            ),
-            "BidPrice": st.column_config.Column(
-                "Premium (Bid)",
-                help="The highest price currently offered by buyers in the market."
-            ),
-            "MidPrice": st.column_config.Column(
-                "Mid Price",
-                help="The calculated average between the current Bid and Ask prices."
-            ),
-            "AskPrice": st.column_config.Column(
-                "Ask",
-                help="The lowest price currently accepted by sellers in the market."
-            ),
-            "Spread": st.column_config.Column(
-                "Bid-Ask Spread",
-                help="The difference between the Ask and Bid prices, serving as an indicator of market liquidity."
-            ),
-            "Breakeven Price": st.column_config.Column(
-                "Breakeven Price",
-                help="The price the underlying asset must reach at expiration for the position to result in a net-zero profit or loss."
-            ),
-            "Static Return %": st.column_config.Column(
-                "Static Return %",
-                help="The projected percentage return if the underlying asset's price remains completely unchanged through expiration."
-            ),
-            "Annualized Return %": st.column_config.Column(
-                "Annualized Return %",
-                help="The return percentage extrapolated over a 12-month period, used to standardize and compare yields across different timeframes."
-            ),
-            "Volume": st.column_config.Column(
-                "Volume",
-                help="The total number of contracts transacted during the current trading period."
-            ),
-            "Open Interest": st.column_config.Column(
-                "Open Interest",
-                help="The total number of active, outstanding contracts currently held by market participants."
-            ),
-            "IV": st.column_config.Column(
-                "Implied Volatility (IV)",
-                help="A quantitative measure representing the market's expectation of future price fluctuations for the underlying asset."
-            )
-        }
+        column_config=col_cfg
     )
 
     # ------------------------------------------------------------------
@@ -875,7 +865,15 @@ def main():
         x=alt.X('Distance to Strike %:Q', title='Distance to Strike % (Safety)', axis=alt.Axis(grid=True)),
         y=alt.Y('Annualized Return %:Q', title='Annualized Return % (Reward)', axis=alt.Axis(grid=True)),
         color=alt.Color('IV:Q', scale=alt.Scale(scheme='oranges')),
-        tooltip=['Ticker', 'Strike', 'Distance to Strike %', 'Annualized Return %', 'IV', 'Volume', 'Open Interest']
+        tooltip=[
+            alt.Tooltip('Ticker', title='Ticker'),
+            alt.Tooltip('Strike', title='Strike', format='$.2f'),
+            alt.Tooltip('Distance to Strike %', format='.2f'),
+            alt.Tooltip('Annualized Return %', format='.2f'),
+            alt.Tooltip('IV', title='Implied Volatility', format='.2f'),
+            alt.Tooltip('Volume', format=',.0f'),
+            alt.Tooltip('Open Interest', format=',.0f'),
+        ]
     )
 
     oi_ring = base.mark_point(filled=False).encode(
