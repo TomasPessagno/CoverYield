@@ -17,6 +17,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from streamlit_searchbox import st_searchbox
 import altair as alt
+import math
 
 
 # =============================================================================
@@ -37,6 +38,16 @@ st.markdown("""
     /* Global text font stack */
     html, body, [class*="css"], [class*="st-"] {
         font-family: 'Mozilla Text', 'Inter', 'Metropolis', sans-serif !important;
+    }
+
+    /* Restore Material icon font — the global rule above otherwise clobbers it,
+       making icons (e.g. the expander arrow) render as literal text like
+       "keyboard_arrow_right". */
+    span[data-testid="stIconMaterial"],
+    [data-testid="stExpanderToggleIcon"],
+    [class*="material-symbols"],
+    [class*="material-icons"] {
+        font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
     }
 
     /* Header font stack */
@@ -163,9 +174,13 @@ def search_yfinance_tickers(query: str) -> list[tuple[str, str]]:
 # ETL STEP 1: DATA EXTRACTION - Fetch options data via yfinance
 # =============================================================================
 
-def fetch_stock_data(ticker: str) -> tuple[str, float, pd.DataFrame]:
+def fetch_stock_data(ticker: str, quiet: bool = False) -> tuple[str, float, pd.DataFrame]:
     """
     Extract raw CALL options data for a given ticker using yfinance.
+
+    Args:
+        quiet: when True, suppress st.error popups (used by the universe scan
+               where per-ticker failures are expected and handled in bulk).
 
     Returns:
         tuple: (ticker, current_price, open_price, calls_df) or (ticker, 0.0, 0.0, empty_df) on error
@@ -208,7 +223,8 @@ def fetch_stock_data(ticker: str) -> tuple[str, float, pd.DataFrame]:
         return ticker, current_price, open_price, options_df
 
     except Exception as e:
-        st.error(f"Error fetching data for {ticker}: {str(e)}")
+        if not quiet:
+            st.error(f"Error fetching data for {ticker}: {str(e)}")
         return ticker, 0.0, 0.0, pd.DataFrame()
 
 
@@ -301,17 +317,11 @@ def transform_data(
 # MAIN APP LOGIC
 # =============================================================================
 
-def main():
+def screener_tab():
     """
-    Main application entry point.
-    Orchestrates the Streamlit UI and ETL pipeline.
+    Renders the single-ticker covered call screener.
+    Orchestrates the Streamlit UI and ETL pipeline for one ticker.
     """
-
-    # --------------------------------------------------------------------------
-    # APP HEADER
-    # --------------------------------------------------------------------------
-
-    st.title("Testeo de Covered Call Screener")
 
     # --------------------------------------------------------------------------
     # CONFIGURATION - Inline at top of page
@@ -892,8 +902,343 @@ def main():
 
 
 # =============================================================================
+# CUSTOM ANALYSIS — multi-stock goal-driven opportunity ranker
+# =============================================================================
+#
+# This tab flips the app around: instead of the user picking a ticker, they
+# state their GOALS (target return, risk tolerance, universe) and the software
+# scans many stocks, scores every covered-call opportunity, and ranks them.
+#
+# It scans the built-in ~57-ticker universe live; a scheduled background job
+# that precomputes the scan is planned.
+
+
+def _norm_cdf(x: float) -> float:
+    """Standard normal CDF via erf — avoids a scipy dependency."""
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
+def black_scholes_call_delta(
+    spot: float, strike: float, t_years: float, iv: float, r: float = 0.045
+) -> float | None:
+    """
+    Call delta = N(d1), which also approximates the risk-neutral probability
+    that the option finishes in-the-money — i.e. the probability of assignment.
+
+    Args:
+        spot:    current stock price
+        strike:  option strike
+        t_years: time to expiry in years
+        iv:      implied volatility as a DECIMAL (0.35, not 35)
+        r:       risk-free rate (annual, decimal)
+
+    Returns:
+        delta in [0, 1], or None if inputs are degenerate.
+    """
+    if spot <= 0 or strike <= 0 or t_years <= 0 or iv <= 0:
+        return None
+    try:
+        d1 = (math.log(spot / strike) + (r + 0.5 * iv * iv) * t_years) / (iv * math.sqrt(t_years))
+        return _norm_cdf(d1)
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
+# The prototype universe = the curated liquid-options tickers we already ship.
+CUSTOM_ANALYSIS_UNIVERSE = list(TICKER_MAP.keys())
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def scan_one_ticker(ticker: str, min_days: int, max_days: int) -> pd.DataFrame:
+    """
+    Fetch + transform a single ticker's calls and enrich with the metrics the
+    scoring engine needs. Cached (10 min TTL) so re-runs and weight tweaks are
+    instant. Returns an empty DataFrame on any failure.
+    """
+    _, price, _, options_df = fetch_stock_data(ticker, quiet=True)
+    if price <= 0 or options_df.empty:
+        return pd.DataFrame()
+
+    df = transform_data(ticker, price, options_df, min_days, max_days)
+    if df.empty:
+        return pd.DataFrame()
+
+    df = df[df['BidPrice'] > 0].copy()  # liquidity gate: drop zero-bid junk
+    if df.empty:
+        return pd.DataFrame()
+
+    df['Current Price'] = price
+    df['Days to Expiry'] = df['expirationDate'].apply(lambda x: (x - datetime.now()).days)
+    df = df[df['Days to Expiry'] > 0].copy()
+    if df.empty:
+        return pd.DataFrame()
+
+    df['Annualized Return %'] = df['Static Return %'] * (365.0 / df['Days to Expiry'])
+    df['Distance to Strike %'] = ((df['Strike'] - price) / price) * 100
+
+    iv_raw = pd.to_numeric(df.get('impliedVolatility', pd.Series(dtype=float)), errors='coerce').fillna(0)
+    df['IV'] = iv_raw * 100
+    df['Volume'] = pd.to_numeric(df.get('volume', pd.Series(dtype=float)), errors='coerce').fillna(0).astype(int)
+    df['Open Interest'] = pd.to_numeric(df.get('openInterest', pd.Series(dtype=float)), errors='coerce').fillna(0).astype(int)
+
+    df['Assignment Prob'] = df.apply(
+        lambda row: black_scholes_call_delta(
+            price, row['Strike'], row['Days to Expiry'] / 365.0, iv_raw.loc[row.name]
+        ),
+        axis=1,
+    )
+    return df
+
+
+def scan_universe(tickers, min_days, max_days, progress_cb=None) -> pd.DataFrame:
+    """Scan a list of tickers and concatenate their enriched option chains."""
+    frames = []
+    total = len(tickers)
+    for i, ticker in enumerate(tickers):
+        try:
+            df = scan_one_ticker(ticker, min_days, max_days)
+        except Exception:
+            df = pd.DataFrame()
+        if not df.empty:
+            frames.append(df)
+        if progress_cb:
+            progress_cb((i + 1) / total, ticker)
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
+
+
+def score_gradient(series: pd.Series, vmin: float = 0, vmax: float = 100) -> list[str]:
+    """White (low) → rich green (high). Matplotlib-free, matches the Screener tab style."""
+    styles = []
+    for val in series:
+        ratio = min(max((val - vmin) / (vmax - vmin), 0), 1) if vmax > vmin else 0
+        r = int(255 - (255 - 30) * ratio)
+        g = int(255 - (255 - 130) * ratio)
+        b = int(255 - (255 - 50) * ratio)
+        text_color = '#000' if ratio < 0.6 else '#fff'
+        styles.append(f'background-color: rgb({r},{g},{b}); color: {text_color}')
+    return styles
+
+
+def compute_opportunity_score(df: pd.DataFrame, weights: dict) -> pd.DataFrame:
+    """
+    Blend five normalized 0-100 components into a single Opportunity Score.
+
+    weights: dict with keys yield/assign/liq/vol/div (already normalized to sum 1).
+    """
+    out = df.copy()
+
+    # 40% Yield — blend of ACTUAL return (real cash this trade) and annualized
+    # (capital efficiency). Leans on actual by default so the ranking reflects
+    # real money, not a short-DTE-favoring projection. Split is user-tunable.
+    actual_norm = (out['Static Return %'] / 5.0).clip(0, 1) * 100      # 0..5% -> 0..100
+    annual_norm = (out['Annualized Return %'] / 60.0).clip(0, 1) * 100  # 0..60% -> 0..100
+    actual_frac = weights.get('yield_actual_frac', 0.7)
+    out['s_yield'] = actual_frac * actual_norm + (1 - actual_frac) * annual_norm
+
+    # 30% Assignment risk — lower delta (prob. of being called away) = better
+    delta = out['Assignment Prob'].fillna(0.5)
+    out['s_assign'] = (1 - delta).clip(0, 1) * 100
+
+    # 15% Liquidity — open interest + volume, penalize wide spreads
+    oi = (out['Open Interest'] / 500.0).clip(0, 1)
+    vol = (out['Volume'] / 200.0).clip(0, 1)
+    spread_quality = 1 - (out['Spread'] / 0.5).clip(0, 1)
+    out['s_liq'] = (oi * 0.5 + vol * 0.3 + spread_quality * 0.2) * 100
+
+    # 10% Volatility — reward moderate IV (~30%), penalize extremes
+    out['s_vol'] = (100 - (out['IV'] - 30).abs() * 1.5).clip(0, 100)
+
+    # 5% Dividend — placeholder neutral (ex-div timing is a v2 item)
+    out['s_div'] = 50.0
+
+    out['Opportunity Score'] = (
+        weights['yield'] * out['s_yield']
+        + weights['assign'] * out['s_assign']
+        + weights['liq'] * out['s_liq']
+        + weights['vol'] * out['s_vol']
+        + weights['div'] * out['s_div']
+    )
+    return out
+
+
+def custom_analysis_tab():
+    """Renders the goal-driven, multi-stock opportunity ranker."""
+
+    st.markdown(
+        "Tell the screener your **goals** and it scans the universe, scores every "
+        "covered-call opportunity, and ranks the best matches. "
+        "<span style='color:#888; font-style:italic;'>Prototype — live scan of the "
+        "built-in liquid-options universe.</span>",
+        unsafe_allow_html=True,
+    )
+
+    # ---- Goals ----
+    st.subheader("Your Goals")
+    g1, g2, g3 = st.columns(3)
+    with g1:
+        min_static = st.slider(
+            "Min Return % (this trade)", min_value=0.0, max_value=20.0, value=1.0, step=0.5,
+            key="ca_min_return", format="%.1f%%",
+            help="The ACTUAL return earned on this trade: premium ÷ stock price over its DTE. "
+                 "Real cash, not a projection. This is the primary goal.",
+        )
+    with g2:
+        max_dte = st.slider(
+            "Max Days to Expiry", min_value=1, max_value=120, value=45, step=1,
+            key="ca_max_dte_sl",
+        )
+    with g3:
+        min_otm = st.slider(
+            "Min Distance OTM %", min_value=0.0, max_value=30.0, value=2.0, step=0.5,
+            key="ca_min_otm_sl", format="%.1f%%",
+            help="How far above today's price the strike must sit.",
+        )
+    st.caption(
+        "Annualized return is shown in the results and feeds the score (capital efficiency), "
+        "but you screen on the *actual* return you'll earn — not a projection."
+    )
+
+    # ---- Scoring weights (user-adjustable) ----
+    with st.expander("Scoring weights (tune the algorithm to your style)", expanded=False):
+        st.caption("Weights are normalized automatically. Defaults: 40 / 30 / 15 / 10 / 5.")
+        yield_actual_pct = st.slider(
+            "Yield make-up: actual return vs annualized rate", 0, 100, 70,
+            key="ca_yield_split", format="%d%% actual",
+            help="How the Yield score is built. Left = pure annualized rate (favors short-dated weeklies); "
+                 "Right = pure actual return (real cash this trade). Default 70% actual.",
+        )
+        w1, w2, w3, w4, w5 = st.columns(5)
+        with w1:
+            w_yield = st.slider("Yield", 0, 100, 40, key="ca_w_yield")
+        with w2:
+            w_assign = st.slider("Assignment Risk", 0, 100, 30, key="ca_w_assign")
+        with w3:
+            w_liq = st.slider("Liquidity", 0, 100, 15, key="ca_w_liq")
+        with w4:
+            w_vol = st.slider("Volatility", 0, 100, 10, key="ca_w_vol")
+        with w5:
+            w_div = st.slider("Dividend", 0, 100, 5, key="ca_w_div")
+
+    u1, u2 = st.columns(2)
+    with u1:
+        universe_size = st.number_input(
+            "Universe size (tickers to scan)", min_value=5, max_value=len(CUSTOM_ANALYSIS_UNIVERSE),
+            value=20, step=5, key="ca_universe_num",
+            help="Live scanning is slow (~1-2s/ticker). Keep small while prototyping.",
+        )
+    with u2:
+        top_n = st.number_input(
+            "Show top N opportunities", min_value=10, max_value=200, value=50, step=10,
+            key="ca_top_n_num",
+        )
+
+    run = st.button("Find Opportunities", type="primary", key="ca_run_button")
+
+    # Weights are read from the current sliders and applied LIVE on every rerun.
+    weight_total = max(w_yield + w_assign + w_liq + w_vol + w_div, 1)
+    weights = {
+        'yield': w_yield / weight_total, 'assign': w_assign / weight_total,
+        'liq': w_liq / weight_total, 'vol': w_vol / weight_total, 'div': w_div / weight_total,
+        'yield_actual_frac': yield_actual_pct / 100.0,
+    }
+
+    # The SCAN (slow) only runs on button click. Its raw result is stashed in
+    # session state, so the goal filters + weights below re-apply instantly on
+    # every widget change — no re-scan needed. (Scan once, filter many.)
+    if run:
+        tickers = CUSTOM_ANALYSIS_UNIVERSE[:universe_size]
+        progress = st.progress(0.0, text="Starting scan...")
+
+        def _update(frac, ticker):
+            progress.progress(frac, text=f"Scanning {ticker}... ({int(frac * 100)}%)")
+
+        # Scan a wide DTE window (1-120d) so Max-DTE becomes a live filter too.
+        scanned = scan_universe(tickers, min_days=1, max_days=120, progress_cb=_update)
+        progress.empty()
+        st.session_state.ca_scanned = scanned if not scanned.empty else None
+        st.session_state.ca_scanned_count = len(tickers)
+
+    scanned = st.session_state.get('ca_scanned')
+    if scanned is None:
+        st.info("Set your goals and click **Find Opportunities** to scan the universe.")
+        return
+
+    # ---- Filter + score LIVE (re-runs on any widget change, no re-scan) ----
+    scanned_count = st.session_state.get('ca_scanned_count', '?')
+    filtered = scanned[
+        (scanned['Static Return %'] >= min_static)
+        & (scanned['Days to Expiry'] <= max_dte)
+        & (scanned['Distance to Strike %'] >= min_otm)
+    ].copy()
+
+    if filtered.empty:
+        st.warning(
+            f"Scanned **{scanned_count}** tickers but **nothing matched your filters**. "
+            "Adjust the goals above — lower **Min Return %**, raise **Max Days to Expiry**, "
+            "or lower **Min Distance OTM %**. Results update live, no need to re-scan."
+        )
+        return
+
+    scored = compute_opportunity_score(filtered, weights)
+    scored = scored.sort_values('Opportunity Score', ascending=False).head(top_n)
+
+    st.success(
+        f"Top **{len(scored)}** of **{len(filtered)}** matching opportunities across "
+        f"**{scanned_count}** scanned tickers, ranked by Opportunity Score."
+    )
+
+    display = scored.copy()
+    display['Strike'] = display['Strike'].map(lambda s: f"${s:.2f}")
+    display['Price'] = display['Current Price'].map(lambda s: f"${s:.2f}")
+    display['Premium'] = display['BidPrice'].map(lambda s: f"${s:.2f}")
+    display['Assign %'] = (display['Assignment Prob'].fillna(0) * 100)
+    display['Yahoo'] = "https://finance.yahoo.com/quote/" + display['contractSymbol']
+
+    cols = [
+        'Opportunity Score', 'Ticker', 'Price', 'Strike', 'Distance to Strike %',
+        'Days to Expiry', 'Premium', 'Static Return %', 'Annualized Return %',
+        'Assign %', 'IV', 'Open Interest', 'Yahoo',
+    ]
+    cols = [c for c in cols if c in display.columns]
+
+    st.dataframe(
+        display[cols].style.format({
+            'Opportunity Score': '{:.0f}',
+            'Distance to Strike %': '{:.1f}%',
+            'Static Return %': '{:.2f}%',
+            'Annualized Return %': '{:.1f}%',
+            'Assign %': '{:.0f}%',
+            'IV': '{:.0f}%',
+        }).apply(score_gradient, subset=['Opportunity Score']),
+        height=520, use_container_width=True, hide_index=True,
+        column_config={
+            'Opportunity Score': st.column_config.Column("Score", help="Weighted 0-100 blend of yield, assignment risk, liquidity, volatility, dividend."),
+            'Distance to Strike %': st.column_config.Column("Dist %"),
+            'Days to Expiry': st.column_config.Column("DTE"),
+            'Static Return %': st.column_config.Column("Yield"),
+            'Annualized Return %': st.column_config.Column("Annual."),
+            'Assign %': st.column_config.Column("Assign %", help="Approx. probability of assignment (≈ call delta)."),
+            'Open Interest': st.column_config.Column("OI"),
+            'Yahoo': st.column_config.LinkColumn("Link", display_text="YC"),
+        },
+    )
+
+
+# =============================================================================
 # RUN THE APP
 # =============================================================================
+
+def main():
+    """App entry point — renders the title and the two tabs."""
+    st.title("Testeo de Covered Call Screener")
+    tab_screener, tab_custom = st.tabs(["Screener", "Custom Analysis"])
+    with tab_screener:
+        screener_tab()
+    with tab_custom:
+        custom_analysis_tab()
+
 
 if __name__ == "__main__":
     main()
