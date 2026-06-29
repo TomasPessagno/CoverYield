@@ -40,6 +40,16 @@ st.markdown("""
         font-family: 'Mozilla Text', 'Inter', 'Metropolis', sans-serif !important;
     }
 
+    /* Restore Material icon font — the global rule above otherwise clobbers it,
+       making icons (e.g. the expander arrow) render as literal text like
+       "keyboard_arrow_right". */
+    span[data-testid="stIconMaterial"],
+    [data-testid="stExpanderToggleIcon"],
+    [class*="material-symbols"],
+    [class*="material-icons"] {
+        font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
+    }
+
     /* Header font stack */
     h1, h2, h3, h4, h5, h6 {
         font-family: 'Mozilla Headline', 'Zilla Slab', 'Metropolis', 'Inter', serif !important;
@@ -1068,20 +1078,22 @@ def custom_analysis_tab():
     st.subheader("Your Goals")
     g1, g2, g3 = st.columns(3)
     with g1:
-        min_static = st.number_input(
-            "Min Return % (this trade)", min_value=0.0, max_value=50.0, value=1.0, step=0.5,
-            key="ca_min_static",
+        min_static = st.slider(
+            "Min Return % (this trade)", min_value=0.0, max_value=20.0, value=1.0, step=0.5,
+            key="ca_min_return", format="%.1f%%",
             help="The ACTUAL return earned on this trade: premium ÷ stock price over its DTE. "
                  "Real cash, not a projection. This is the primary goal.",
         )
     with g2:
-        max_dte = st.number_input(
-            "Max Days to Expiry", min_value=1, max_value=120, value=45, step=1, key="ca_max_dte",
+        max_dte = st.slider(
+            "Max Days to Expiry", min_value=1, max_value=120, value=45, step=1,
+            key="ca_max_dte_sl",
         )
     with g3:
-        min_otm = st.number_input(
-            "Min Distance OTM %", min_value=0.0, max_value=50.0, value=2.0, step=0.5,
-            key="ca_min_otm", help="How far above today's price the strike must sit.",
+        min_otm = st.slider(
+            "Min Distance OTM %", min_value=0.0, max_value=30.0, value=2.0, step=0.5,
+            key="ca_min_otm_sl", format="%.1f%%",
+            help="How far above today's price the strike must sit.",
         )
     st.caption(
         "Annualized return is shown in the results and feeds the score (capital efficiency), "
@@ -1109,12 +1121,18 @@ def custom_analysis_tab():
         with w5:
             w_div = st.slider("Dividend", 0, 100, 5, key="ca_w_div")
 
-    universe_size = st.slider(
-        "Universe size (tickers to scan)", min_value=5, max_value=len(CUSTOM_ANALYSIS_UNIVERSE),
-        value=20, step=5, key="ca_universe_size",
-        help="Live scanning is slow (~1-2s/ticker). Keep small while prototyping.",
-    )
-    top_n = st.slider("Show top N opportunities", 10, 200, 50, step=10, key="ca_top_n")
+    u1, u2 = st.columns(2)
+    with u1:
+        universe_size = st.number_input(
+            "Universe size (tickers to scan)", min_value=5, max_value=len(CUSTOM_ANALYSIS_UNIVERSE),
+            value=20, step=5, key="ca_universe_num",
+            help="Live scanning is slow (~1-2s/ticker). Keep small while prototyping.",
+        )
+    with u2:
+        top_n = st.number_input(
+            "Show top N opportunities", min_value=10, max_value=200, value=50, step=10,
+            key="ca_top_n_num",
+        )
 
     run = st.button("Find Opportunities", type="primary", key="ca_run_button")
 
