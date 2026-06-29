@@ -1118,61 +1118,60 @@ def custom_analysis_tab():
 
     run = st.button("Find Opportunities", type="primary", key="ca_run_button")
 
-    if run:
-        weight_total = max(w_yield + w_assign + w_liq + w_vol + w_div, 1)
-        weights = {
-            'yield': w_yield / weight_total, 'assign': w_assign / weight_total,
-            'liq': w_liq / weight_total, 'vol': w_vol / weight_total, 'div': w_div / weight_total,
-            'yield_actual_frac': yield_actual_pct / 100.0,
-        }
-        tickers = CUSTOM_ANALYSIS_UNIVERSE[:universe_size]
+    # Weights are read from the current sliders and applied LIVE on every rerun.
+    weight_total = max(w_yield + w_assign + w_liq + w_vol + w_div, 1)
+    weights = {
+        'yield': w_yield / weight_total, 'assign': w_assign / weight_total,
+        'liq': w_liq / weight_total, 'vol': w_vol / weight_total, 'div': w_div / weight_total,
+        'yield_actual_frac': yield_actual_pct / 100.0,
+    }
 
+    # The SCAN (slow) only runs on button click. Its raw result is stashed in
+    # session state, so the goal filters + weights below re-apply instantly on
+    # every widget change — no re-scan needed. (Scan once, filter many.)
+    if run:
+        tickers = CUSTOM_ANALYSIS_UNIVERSE[:universe_size]
         progress = st.progress(0.0, text="Starting scan...")
 
         def _update(frac, ticker):
             progress.progress(frac, text=f"Scanning {ticker}... ({int(frac * 100)}%)")
 
-        # max_days for the chain fetch is the user's max DTE; min_days=1 keeps it wide.
-        scanned = scan_universe(tickers, min_days=1, max_days=int(max_dte), progress_cb=_update)
+        # Scan a wide DTE window (1-120d) so Max-DTE becomes a live filter too.
+        scanned = scan_universe(tickers, min_days=1, max_days=120, progress_cb=_update)
         progress.empty()
-
-        if scanned.empty:
-            st.warning("No option data returned for the scanned universe. Try a larger universe size.")
-            st.session_state.ca_results = None
-            return
-
-        # Apply the user's goal filters
-        filtered = scanned[
-            (scanned['Static Return %'] >= min_static)
-            & (scanned['Days to Expiry'] <= max_dte)
-            & (scanned['Distance to Strike %'] >= min_otm)
-        ].copy()
-
-        if filtered.empty:
-            st.warning(
-                f"Scanned {len(tickers)} tickers but **nothing matched your goals**. "
-                "Try loosening the targets (lower annualized return, lower min OTM)."
-            )
-            st.session_state.ca_results = None
-            return
-
-        scored = compute_opportunity_score(filtered, weights)
-        scored = scored.sort_values('Opportunity Score', ascending=False).head(top_n)
-        st.session_state.ca_results = scored
+        st.session_state.ca_scanned = scanned if not scanned.empty else None
         st.session_state.ca_scanned_count = len(tickers)
 
-    # ---- Display results ----
-    results = st.session_state.get('ca_results')
-    if results is None:
+    scanned = st.session_state.get('ca_scanned')
+    if scanned is None:
         st.info("Set your goals and click **Find Opportunities** to scan the universe.")
         return
 
+    # ---- Filter + score LIVE (re-runs on any widget change, no re-scan) ----
+    scanned_count = st.session_state.get('ca_scanned_count', '?')
+    filtered = scanned[
+        (scanned['Static Return %'] >= min_static)
+        & (scanned['Days to Expiry'] <= max_dte)
+        & (scanned['Distance to Strike %'] >= min_otm)
+    ].copy()
+
+    if filtered.empty:
+        st.warning(
+            f"Scanned **{scanned_count}** tickers but **nothing matched your filters**. "
+            "Adjust the goals above — lower **Min Return %**, raise **Max Days to Expiry**, "
+            "or lower **Min Distance OTM %**. Results update live, no need to re-scan."
+        )
+        return
+
+    scored = compute_opportunity_score(filtered, weights)
+    scored = scored.sort_values('Opportunity Score', ascending=False).head(top_n)
+
     st.success(
-        f"Top **{len(results)}** opportunities across "
-        f"**{st.session_state.get('ca_scanned_count', '?')}** scanned tickers, ranked by Opportunity Score."
+        f"Top **{len(scored)}** of **{len(filtered)}** matching opportunities across "
+        f"**{scanned_count}** scanned tickers, ranked by Opportunity Score."
     )
 
-    display = results.copy()
+    display = scored.copy()
     display['Strike'] = display['Strike'].map(lambda s: f"${s:.2f}")
     display['Price'] = display['Current Price'].map(lambda s: f"${s:.2f}")
     display['Premium'] = display['BidPrice'].map(lambda s: f"${s:.2f}")
