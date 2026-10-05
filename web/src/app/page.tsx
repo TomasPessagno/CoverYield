@@ -213,7 +213,7 @@ function QuoteHeader({
   const change = data.open_price > 0 ? data.price - data.open_price : null;
   const changePct = change !== null ? (change / data.open_price) * 100 : null;
   return (
-    <div className="sticky top-12 z-10 -mx-4 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-b border-border bg-bg/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
+    <div className="sticky top-12 z-20 -mx-4 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-b border-border bg-bg/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
       <h1 className="text-2xl font-semibold tracking-tight">{data.ticker}</h1>
       <span className="num text-2xl">{fmtUsd(data.price)}</span>
       {change !== null && changePct !== null && (

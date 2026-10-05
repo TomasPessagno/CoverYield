@@ -24,7 +24,7 @@ function toggleTheme() {
 export function TopBar() {
   const pathname = usePathname();
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-bg/90 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-border bg-bg/90 backdrop-blur">
       <div className="mx-auto flex h-12 w-full max-w-[1440px] items-center gap-8 px-4 sm:px-6">
         <Link href="/" className="text-[15px] font-semibold tracking-tight">
           ThetaScout
