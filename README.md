@@ -1,6 +1,6 @@
 # ThetaScout
 
-[![CI](https://github.com/TomasPessagno/coveredcallscreener/actions/workflows/ci.yml/badge.svg)](https://github.com/TomasPessagno/coveredcallscreener/actions/workflows/ci.yml)
+[![CI](https://github.com/TomasPessagno/ThetaScout/actions/workflows/ci.yml/badge.svg)](https://github.com/TomasPessagno/ThetaScout/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A covered call screener. It pulls live option chains, computes the metrics a call
@@ -55,8 +55,8 @@ streamlit_app.py
 ## Run it locally
 
 ```bash
-git clone https://github.com/TomasPessagno/coveredcallscreener.git
-cd coveredcallscreener
+git clone https://github.com/TomasPessagno/ThetaScout.git
+cd ThetaScout
 pip install -r requirements.txt
 python -m streamlit run streamlit_app.py
 ```
