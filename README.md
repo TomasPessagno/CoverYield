@@ -16,7 +16,7 @@ scoring model.
 - **Screener:** pick a ticker and see every call in your expiry window with static
   and annualized return, distance to strike, breakeven, bid-ask spread, volume,
   open interest and implied volatility, plus a risk-vs-reward chart.
-- **Custom Analysis:** set goals (minimum return, maximum days to expiry, minimum
+- **Scan:** set goals (minimum return, maximum days to expiry, minimum
   distance out of the money) and scan a universe of liquid stocks and ETFs. Every
   contract gets an **Opportunity Score** (0-100), and the weights are adjustable.
 
@@ -35,21 +35,25 @@ dividend (5%, currently neutral).
 
 ## Tech stack
 
-- **Python 3.11+**, **pandas** for the analytics, **yfinance** for market data
-- **Streamlit** + **Altair** for the current UI
-- **pytest** + **Hypothesis** (property-based tests), **ruff**, **mypy --strict**,
-  GitHub Actions CI
+- **Frontend:** Next.js (App Router), TypeScript, Tailwind CSS; charts drawn in SVG
+- **API:** FastAPI with Pydantic models; the frontend's TypeScript types are generated
+  from its OpenAPI schema
+- **Analytics:** Python 3.11+, pandas, yfinance for market data, with a 10-minute
+  per-ticker cache
+- **Quality:** pytest + Hypothesis (property-based tests), ruff, mypy --strict,
+  ESLint, GitHub Actions CI
 
-All data access and math live in the `thetascout` package, which has no UI code, so
-the same logic can back other frontends.
+All data access and math live in the `thetascout` package, which has no UI code.
 
 ```
 thetascout/
-  data/        market-data provider interface, Yahoo Finance implementation, ticker universe
+  data/        market-data provider interface, Yahoo Finance implementation, cache, universe
   pricing/     Black-Scholes
   screening/   chain filters, per-contract metrics, multi-stock scan, scoring
-tests/         unit and property-based tests (offline, no network needed)
-streamlit_app.py
+api/           FastAPI app exposing the package over HTTP
+web/           Next.js frontend
+tests/         unit, property-based and API tests (offline, no network needed)
+streamlit_app.py   the original Streamlit UI, kept while the new frontend is rolled out
 ```
 
 ## Run it locally
@@ -57,11 +61,22 @@ streamlit_app.py
 ```bash
 git clone https://github.com/TomasPessagno/ThetaScout.git
 cd ThetaScout
-pip install -r requirements.txt
-python -m streamlit run streamlit_app.py
+pip install -e ".[api]"
+uvicorn api.app:app --port 8000
 ```
 
-For development: `pip install -e ".[app,dev]"`, then `ruff check .`, `mypy` and `pytest`.
+In a second terminal:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Then open http://localhost:3000.
+
+For development: `pip install -e ".[app,api,dev]"`, then `ruff check .`, `mypy` and
+`pytest`; in `web/`, `npm run lint` and `npm run typecheck`.
 
 ## Disclaimer
 

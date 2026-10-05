@@ -1,0 +1,772 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ThetaScout API",
+    "description": "Covered call screening, Black-Scholes assignment probability and scoring.",
+    "version": "0.2.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Api Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/universe": {
+      "get": {
+        "summary": "Universe",
+        "operationId": "universe_api_universe_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UniverseTicker"
+                  },
+                  "type": "array",
+                  "title": "Response Universe Api Universe Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "summary": "Search",
+        "operationId": "search_api_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TickerMatch"
+                  },
+                  "title": "Response Search Api Search Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screener/{ticker}": {
+      "get": {
+        "summary": "Screener",
+        "description": "Every call in the expiry window with its metrics; finer filters are applied client-side.",
+        "operationId": "screener_api_screener__ticker__get",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 12,
+              "pattern": "^[A-Za-z0-9.\\-^=]+$",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "min_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 0,
+              "default": 7,
+              "title": "Min Days"
+            }
+          },
+          {
+            "name": "max_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 730,
+              "minimum": 1,
+              "default": 42,
+              "title": "Max Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scan/{ticker}": {
+      "post": {
+        "summary": "Scan Ticker",
+        "description": "Fetch and enrich one ticker (warming the cache). Lets clients show scan progress.",
+        "operationId": "scan_ticker_api_scan__ticker__post",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 12,
+              "pattern": "^[A-Za-z0-9.\\-^=]+$",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanTickerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/opportunities": {
+      "post": {
+        "summary": "Opportunities",
+        "description": "Filter the scanned tickers by the user's goals, score every contract and rank them.",
+        "operationId": "opportunities_api_opportunities_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpportunitiesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpportunitiesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Contract": {
+        "properties": {
+          "contract_symbol": {
+            "type": "string",
+            "title": "Contract Symbol"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "expiration": {
+            "type": "string",
+            "format": "date",
+            "title": "Expiration"
+          },
+          "days_to_expiry": {
+            "type": "integer",
+            "title": "Days To Expiry"
+          },
+          "strike": {
+            "type": "number",
+            "title": "Strike"
+          },
+          "bid": {
+            "type": "number",
+            "title": "Bid"
+          },
+          "ask": {
+            "type": "number",
+            "title": "Ask"
+          },
+          "mid": {
+            "type": "number",
+            "title": "Mid"
+          },
+          "spread": {
+            "type": "number",
+            "title": "Spread"
+          },
+          "static_return_pct": {
+            "type": "number",
+            "title": "Static Return Pct",
+            "description": "bid / stock price, in percent"
+          },
+          "annualized_return_pct": {
+            "type": "number",
+            "title": "Annualized Return Pct",
+            "description": "static return x 365 / days to expiry"
+          },
+          "distance_to_strike_pct": {
+            "type": "number",
+            "title": "Distance To Strike Pct",
+            "description": "(strike - price) / price, in percent"
+          },
+          "breakeven": {
+            "type": "number",
+            "title": "Breakeven",
+            "description": "stock price minus the premium collected"
+          },
+          "volume": {
+            "type": "integer",
+            "title": "Volume"
+          },
+          "open_interest": {
+            "type": "integer",
+            "title": "Open Interest"
+          },
+          "iv_pct": {
+            "type": "number",
+            "title": "Iv Pct",
+            "description": "implied volatility, in percent"
+          },
+          "assignment_prob": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Prob",
+            "description": "Black-Scholes call delta: approx. probability of finishing in the money"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contract_symbol",
+          "ticker",
+          "expiration",
+          "days_to_expiry",
+          "strike",
+          "bid",
+          "ask",
+          "mid",
+          "spread",
+          "static_return_pct",
+          "annualized_return_pct",
+          "distance_to_strike_pct",
+          "breakeven",
+          "volume",
+          "open_interest",
+          "iv_pct",
+          "assignment_prob"
+        ],
+        "title": "Contract",
+        "description": "One call option with the metrics a covered-call seller cares about."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "OpportunitiesRequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Tickers"
+          },
+          "min_static_return_pct": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Min Static Return Pct",
+            "default": 1.0
+          },
+          "max_days_to_expiry": {
+            "type": "integer",
+            "maximum": 365.0,
+            "minimum": 1.0,
+            "title": "Max Days To Expiry",
+            "default": 45
+          },
+          "min_otm_pct": {
+            "type": "number",
+            "title": "Min Otm Pct",
+            "default": 2.0
+          },
+          "weights": {
+            "$ref": "#/components/schemas/Weights"
+          },
+          "yield_actual_frac": {
+            "type": "number",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Yield Actual Frac",
+            "default": 0.7
+          },
+          "top_n": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Top N",
+            "default": 50
+          }
+        },
+        "type": "object",
+        "required": [
+          "tickers"
+        ],
+        "title": "OpportunitiesRequest"
+      },
+      "OpportunitiesResponse": {
+        "properties": {
+          "scanned": {
+            "type": "integer",
+            "title": "Scanned"
+          },
+          "matched": {
+            "type": "integer",
+            "title": "Matched"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/Opportunity"
+            },
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "scanned",
+          "matched",
+          "results"
+        ],
+        "title": "OpportunitiesResponse"
+      },
+      "Opportunity": {
+        "properties": {
+          "contract_symbol": {
+            "type": "string",
+            "title": "Contract Symbol"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "expiration": {
+            "type": "string",
+            "format": "date",
+            "title": "Expiration"
+          },
+          "days_to_expiry": {
+            "type": "integer",
+            "title": "Days To Expiry"
+          },
+          "strike": {
+            "type": "number",
+            "title": "Strike"
+          },
+          "bid": {
+            "type": "number",
+            "title": "Bid"
+          },
+          "ask": {
+            "type": "number",
+            "title": "Ask"
+          },
+          "mid": {
+            "type": "number",
+            "title": "Mid"
+          },
+          "spread": {
+            "type": "number",
+            "title": "Spread"
+          },
+          "static_return_pct": {
+            "type": "number",
+            "title": "Static Return Pct",
+            "description": "bid / stock price, in percent"
+          },
+          "annualized_return_pct": {
+            "type": "number",
+            "title": "Annualized Return Pct",
+            "description": "static return x 365 / days to expiry"
+          },
+          "distance_to_strike_pct": {
+            "type": "number",
+            "title": "Distance To Strike Pct",
+            "description": "(strike - price) / price, in percent"
+          },
+          "breakeven": {
+            "type": "number",
+            "title": "Breakeven",
+            "description": "stock price minus the premium collected"
+          },
+          "volume": {
+            "type": "integer",
+            "title": "Volume"
+          },
+          "open_interest": {
+            "type": "integer",
+            "title": "Open Interest"
+          },
+          "iv_pct": {
+            "type": "number",
+            "title": "Iv Pct",
+            "description": "implied volatility, in percent"
+          },
+          "assignment_prob": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Prob",
+            "description": "Black-Scholes call delta: approx. probability of finishing in the money"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "score_yield": {
+            "type": "number",
+            "title": "Score Yield"
+          },
+          "score_assignment": {
+            "type": "number",
+            "title": "Score Assignment"
+          },
+          "score_liquidity": {
+            "type": "number",
+            "title": "Score Liquidity"
+          },
+          "score_volatility": {
+            "type": "number",
+            "title": "Score Volatility"
+          },
+          "score_dividend": {
+            "type": "number",
+            "title": "Score Dividend"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contract_symbol",
+          "ticker",
+          "expiration",
+          "days_to_expiry",
+          "strike",
+          "bid",
+          "ask",
+          "mid",
+          "spread",
+          "static_return_pct",
+          "annualized_return_pct",
+          "distance_to_strike_pct",
+          "breakeven",
+          "volume",
+          "open_interest",
+          "iv_pct",
+          "assignment_prob",
+          "price",
+          "score",
+          "score_yield",
+          "score_assignment",
+          "score_liquidity",
+          "score_volatility",
+          "score_dividend"
+        ],
+        "title": "Opportunity"
+      },
+      "ScanTickerResponse": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "contracts": {
+            "type": "integer",
+            "title": "Contracts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "ok",
+          "contracts"
+        ],
+        "title": "ScanTickerResponse"
+      },
+      "ScreenerResponse": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "price": {
+            "type": "number",
+            "title": "Price"
+          },
+          "open_price": {
+            "type": "number",
+            "title": "Open Price"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "title": "As Of"
+          },
+          "contracts": {
+            "items": {
+              "$ref": "#/components/schemas/Contract"
+            },
+            "type": "array",
+            "title": "Contracts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "price",
+          "open_price",
+          "as_of",
+          "contracts"
+        ],
+        "title": "ScreenerResponse"
+      },
+      "TickerMatch": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "symbol"
+        ],
+        "title": "TickerMatch"
+      },
+      "UniverseTicker": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "name"
+        ],
+        "title": "UniverseTicker"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "Weights": {
+        "properties": {
+          "yield": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Yield",
+            "default": 40
+          },
+          "assign": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Assign",
+            "default": 30
+          },
+          "liq": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Liq",
+            "default": 15
+          },
+          "vol": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Vol",
+            "default": 10
+          },
+          "div": {
+            "type": "number",
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Div",
+            "default": 5
+          }
+        },
+        "type": "object",
+        "title": "Weights",
+        "description": "Raw Opportunity Score weights (normalized server-side)."
+      }
+    }
+  }
+}

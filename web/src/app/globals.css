@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+/* Design tokens: a dark, terminal-inspired palette with one accent (amber). */
+:root {
+  color-scheme: dark;
+  --bg: #0a0b0d;
+  --panel: #111316;
+  --panel-2: #16191d;
+  --border: #22262c;
+  --grid: #1b1e23;
+  --text: #e8e8e6;
+  --text-2: #a3a7ad;
+  --muted: #6f747b;
+  --accent: #ffa028;
+  --accent-dim: #8a5a12;
+  --up: #3ccf7e;
+  --down: #f2555a;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-border: var(--border);
+  --color-grid: var(--grid);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-dim: var(--accent-dim);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-plex-sans), system-ui, sans-serif;
+}
+
+/* Numbers line up in columns */
+.num {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Small uppercase labels used for section titles and field labels */
+.label {
+  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Range inputs styled to match the palette */
+input[type="range"] {
+  accent-color: var(--accent);
+}
+
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+::selection {
+  background: rgb(255 160 40 / 0.3);
+}
