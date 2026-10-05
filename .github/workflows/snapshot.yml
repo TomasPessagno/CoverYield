@@ -1,0 +1,48 @@
+name: Snapshot
+
+# Fetches the ticker universe into the hosted Redis store, so the website serves
+# every visitor from these snapshots instead of calling Yahoo per page view.
+#
+# GitHub cron runs in UTC; these windows cover US market hours in both summer
+# (EDT) and winter (EST) time. The script itself checks New York time and only
+# fetches between 9:55 and 16:30, so the extra runs exit immediately.
+
+on:
+  schedule:
+    - cron: "5 14-20 * * 1-5" # hourly at :05 during market hours
+    - cron: "20 20,21 * * 1-5" # just after the close (EDT / EST)
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Run even outside market hours"
+        type: boolean
+        default: false
+
+concurrency:
+  group: snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      REDIS_URL: ${{ secrets.REDIS_URL }}
+    steps:
+      - name: Skip until the Redis secret is configured
+        if: env.REDIS_URL == ''
+        run: echo "::notice::Add the REDIS_URL repository secret to enable snapshots."
+      - uses: actions/checkout@v4
+        if: env.REDIS_URL != ''
+      - uses: actions/setup-python@v5
+        if: env.REDIS_URL != ''
+        with:
+          python-version: "3.14"
+      - name: Install
+        if: env.REDIS_URL != ''
+        run: pip install -e ".[api]"
+      - name: Snapshot
+        if: env.REDIS_URL != ''
+        env:
+          THETASCOUT_MODE: hosted
+        run: python -m api.snapshot ${{ inputs.force && '--force' || '' }}
