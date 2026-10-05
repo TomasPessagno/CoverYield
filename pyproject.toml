@@ -25,6 +25,7 @@ app = [
 api = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
+    "redis>=5",
 ]
 dev = [
     "pytest>=8",
@@ -33,6 +34,7 @@ dev = [
     "mypy>=1.11",
     "pandas-stubs",
     "httpx",
+    "fakeredis>=2",
 ]
 
 [tool.setuptools.packages.find]
