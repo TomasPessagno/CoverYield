@@ -1,5 +1,5 @@
 """
-Covered Call Screener - Streamlit Web Application
+ThetaScout - Covered Call Screener (Streamlit app)
 ==================================================
 
 This app screens call options for covered call strategies by:
@@ -25,7 +25,7 @@ import math
 # =============================================================================
 
 st.set_page_config(
-    page_title="Testeo de Covered Call Screener",
+    page_title="ThetaScout",
     layout="wide"
 )
 
@@ -1232,7 +1232,7 @@ def custom_analysis_tab():
 
 def main():
     """App entry point — renders the title and the two tabs."""
-    st.title("Testeo de Covered Call Screener")
+    st.title("ThetaScout")
     tab_screener, tab_custom = st.tabs(["Screener", "Custom Analysis"])
     with tab_screener:
         screener_tab()
