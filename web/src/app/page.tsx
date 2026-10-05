@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 
 import { DataTable, type Column } from "@/components/DataTable";
-import { ErrorNote, Field, NumberInput, Panel, SliderInput } from "@/components/fields";
+import {
+  ErrorNote,
+  Field,
+  NumberInput,
+  OptionalNumberInput,
+  Panel,
+  SliderInput,
+} from "@/components/fields";
 import { RiskRewardChart } from "@/components/RiskRewardChart";
 import { TickerSearch } from "@/components/TickerSearch";
 import { YahooLink } from "@/components/YahooLink";
@@ -32,7 +39,7 @@ export default function ScreenerPage() {
 
   // Client-side filters: applied instantly to the loaded chain, no refetch.
   const [minOffset, setMinOffset] = useState(0);
-  const [maxOffset, setMaxOffset] = useState(10);
+  const [maxOffset, setMaxOffset] = useState<number | null>(null); // null = no upper limit
   const [minStatic, setMinStatic] = useState(0);
   const [minAnnual, setMinAnnual] = useState(0);
 
@@ -71,7 +78,7 @@ export default function ScreenerPage() {
     data?.contracts.filter(
       (c) =>
         c.strike >= data.price + minOffset &&
-        c.strike <= data.price + maxOffset &&
+        (maxOffset === null || c.strike <= data.price + maxOffset) &&
         c.static_return_pct >= minStatic &&
         c.annualized_return_pct >= minAnnual,
     ) ?? [];
@@ -110,8 +117,15 @@ export default function ScreenerPage() {
               <Field label="Min strike offset" hint="Strike at least this far above the stock price">
                 <NumberInput value={minOffset} onChange={setMinOffset} step={1} suffix="$" />
               </Field>
-              <Field label="Max strike offset" hint="Strike at most this far above the stock price">
-                <NumberInput value={maxOffset} onChange={setMaxOffset} step={1} suffix="$" />
+              <Field label="Max strike offset" hint="Strike at most this far above the stock price. Leave empty for no limit">
+                <OptionalNumberInput
+                  value={maxOffset}
+                  onChange={setMaxOffset}
+                  min={0}
+                  step={1}
+                  suffix="$"
+                  placeholder="No max"
+                />
               </Field>
               <Field label="Min static return" hint="Premium / stock price">
                 <SliderInput value={minStatic} onChange={setMinStatic} min={0} max={20} step={0.5} format={(v) => fmtPct(v, 1)} />
@@ -132,7 +146,7 @@ export default function ScreenerPage() {
               </>
             ) : (
               <p className="px-4 py-8 text-center text-sm text-muted">
-                No contracts match these filters. Try widening the strike offsets.
+                No contracts match these filters. Try lowering the minimums or raising the max strike offset.
               </p>
             )}
           </Panel>

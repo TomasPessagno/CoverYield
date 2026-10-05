@@ -62,6 +62,46 @@ export function NumberInput({
   );
 }
 
+/** A number input that may be left empty, meaning "no value" (e.g. no upper limit). */
+export function OptionalNumberInput({
+  value,
+  onChange,
+  min,
+  step = 1,
+  suffix,
+  placeholder,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  min?: number;
+  step?: number;
+  suffix?: string;
+  placeholder?: string;
+}) {
+  return (
+    <div className="relative">
+      <input
+        type="number"
+        className={`${inputClass} placeholder:text-muted ${suffix ? "pr-8" : ""}`}
+        value={value ?? ""}
+        min={min}
+        step={step}
+        placeholder={placeholder}
+        onChange={(e) => {
+          if (e.target.value === "") return onChange(null);
+          const v = e.target.valueAsNumber;
+          if (Number.isFinite(v)) onChange(v);
+        }}
+      />
+      {suffix && (
+        <span className="num pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 text-xs text-muted">
+          {suffix}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function SliderInput({
   value,
   onChange,
