@@ -7,7 +7,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from thetascout.data.provider import DataFetchError, MarketDataProvider
+from thetascout.data.provider import CallChain, DataFetchError, MarketDataProvider
 from thetascout.data.yahoo import YahooFinanceProvider
 from thetascout.screening.filters import (
     add_assignment_probability,
@@ -35,11 +35,18 @@ def scan_one_ticker(
         chain = provider.fetch_call_chain(ticker)
     except DataFetchError:
         return pd.DataFrame()
+    return enrich_chain(chain, min_days, max_days, now=now)
+
+
+def enrich_chain(
+    chain: CallChain, min_days: int, max_days: int, now: datetime | None = None
+) -> pd.DataFrame:
+    """Filter an already-fetched chain and add the metrics the scoring engine needs."""
     if chain.is_empty:
         return pd.DataFrame()
     price = chain.price
 
-    df = filter_calls(ticker, price, chain.calls, min_days, max_days, now=now)
+    df = filter_calls(chain.ticker, price, chain.calls, min_days, max_days, now=now)
     if df.empty:
         return pd.DataFrame()
 

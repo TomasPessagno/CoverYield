@@ -21,6 +21,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Config
+         * @description What this deployment allows, so the frontend can show the right controls.
+         */
+        get: operations["config_api_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/universe": {
         parameters: {
             query?: never;
@@ -66,11 +86,35 @@ export interface paths {
          * Screener
          * @description Every call in the expiry window with its metrics; finer filters are applied client-side.
          *
-         *     Omitting ``min_days`` or ``max_days`` means no limit on that side.
+         *     Serves the stored copy of the ticker when there is one. Omitting ``min_days``
+         *     or ``max_days`` means no limit on that side.
          */
         get: operations["screener_api_screener__ticker__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/refresh/{ticker}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh
+         * @description 'Scan now': fetch this ticker live, unless it was fetched within the cooldown.
+         *
+         *     Within the cooldown the stored copy is returned with ``refreshed: false`` and
+         *     ``next_refresh_at`` set, so the client can show when a refresh is allowed.
+         */
+        post: operations["refresh_api_refresh__ticker__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -88,7 +132,7 @@ export interface paths {
         put?: never;
         /**
          * Scan Ticker
-         * @description Fetch and enrich one ticker (warming the cache). Lets clients show scan progress.
+         * @description Load and enrich one ticker (from the store when possible). Lets clients show progress.
          */
         post: operations["scan_ticker_api_scan__ticker__post"];
         delete?: never;
@@ -121,6 +165,24 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AppConfig */
+        AppConfig: {
+            /**
+             * Mode
+             * @description "local" or "hosted"
+             */
+            mode: string;
+            /**
+             * Refresh Cooldown Seconds
+             * @description Minimum time between live refreshes of the same ticker (0 = no limit)
+             */
+            refresh_cooldown_seconds: number;
+            /**
+             * Shared Store
+             * @description Chains are stored in Redis rather than memory
+             */
+            shared_store: boolean;
+        };
         /**
          * Contract
          * @description One call option with the metrics a covered-call seller cares about.
@@ -224,6 +286,11 @@ export interface components {
             scanned: number;
             /** Matched */
             matched: number;
+            /**
+             * Oldest Data At
+             * @description Fetch time of the oldest ticker data used in the ranking
+             */
+            oldest_data_at: string | null;
             /** Results */
             results: components["schemas"]["Opportunity"][];
         };
@@ -319,8 +386,24 @@ export interface components {
             /**
              * As Of
              * Format: date-time
+             * @description When this ticker's data was fetched from the source
              */
             as_of: string;
+            /**
+             * Refreshed
+             * @description The data was fetched live for this request
+             */
+            refreshed: boolean;
+            /**
+             * Stale
+             * @description A live fetch failed, so this is the last good copy
+             */
+            stale: boolean;
+            /**
+             * Next Refresh At
+             * @description When a live refresh is allowed again (null = now)
+             */
+            next_refresh_at: string | null;
             /** Contracts */
             contracts: components["schemas"]["Contract"][];
         };
@@ -413,6 +496,26 @@ export interface operations {
             };
         };
     };
+    config_api_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppConfig"];
+                };
+            };
+        };
+    };
     universe_api_universe_get: {
         parameters: {
             query?: never;
@@ -465,6 +568,40 @@ export interface operations {
         };
     };
     screener_api_screener__ticker__get: {
+        parameters: {
+            query?: {
+                min_days?: number | null;
+                max_days?: number | null;
+            };
+            header?: never;
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenerResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_api_refresh__ticker__post: {
         parameters: {
             query?: {
                 min_days?: number | null;

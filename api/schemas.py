@@ -45,11 +45,24 @@ class Contract(BaseModel):
     )
 
 
+class AppConfig(BaseModel):
+    mode: str = Field(description='"local" or "hosted"')
+    refresh_cooldown_seconds: float = Field(
+        description="Minimum time between live refreshes of the same ticker (0 = no limit)"
+    )
+    shared_store: bool = Field(description="Chains are stored in Redis rather than memory")
+
+
 class ScreenerResponse(BaseModel):
     ticker: str
     price: float
     open_price: float
-    as_of: datetime
+    as_of: datetime = Field(description="When this ticker's data was fetched from the source")
+    refreshed: bool = Field(description="The data was fetched live for this request")
+    stale: bool = Field(description="A live fetch failed, so this is the last good copy")
+    next_refresh_at: datetime | None = Field(
+        description="When a live refresh is allowed again (null = now)"
+    )
     contracts: list[Contract]
 
 
@@ -94,4 +107,7 @@ class Opportunity(Contract):
 class OpportunitiesResponse(BaseModel):
     scanned: int
     matched: int
+    oldest_data_at: datetime | None = Field(
+        description="Fetch time of the oldest ticker data used in the ranking"
+    )
     results: list[Opportunity]
