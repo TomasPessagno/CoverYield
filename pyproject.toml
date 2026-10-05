@@ -22,12 +22,17 @@ app = [
     "altair>=5",
     "streamlit-searchbox>=0.1.20",
 ]
+api = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+]
 dev = [
     "pytest>=8",
     "hypothesis>=6",
     "ruff>=0.6",
     "mypy>=1.11",
     "pandas-stubs",
+    "httpx",
 ]
 
 [tool.setuptools.packages.find]
@@ -46,7 +51,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 
 [tool.mypy]
 python_version = "3.11"
-packages = ["thetascout"]
+packages = ["thetascout", "api"]
 strict = true
 
 [[tool.mypy.overrides]]

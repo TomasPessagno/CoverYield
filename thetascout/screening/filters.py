@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
+from thetascout.pricing.black_scholes import call_delta
+
 # Strikes below this fraction of the stock price are deep in the money and dropped.
 MIN_STRIKE_FRACTION = 0.90
 
@@ -92,6 +94,21 @@ def add_contract_metrics(
     out["Volume"] = numeric_column(out, "volume").astype(int)
     out["Open Interest"] = numeric_column(out, "openInterest").astype(int)
     out["IV"] = numeric_column(out, "impliedVolatility") * 100
+    return out
+
+
+def add_assignment_probability(df: pd.DataFrame, current_price: float) -> pd.DataFrame:
+    """Add ``Assignment Prob``: Black-Scholes call delta from each contract's own IV.
+
+    Expects ``Days to Expiry`` (see ``add_contract_metrics``). Contracts with no
+    usable IV or an expiry of today get ``None``.
+    """
+    out = df.copy()
+    iv_decimal = numeric_column(out, "impliedVolatility")
+    out["Assignment Prob"] = [
+        call_delta(current_price, strike, dte / 365.0, iv)
+        for strike, dte, iv in zip(out["Strike"], out["Days to Expiry"], iv_decimal, strict=True)
+    ]
     return out
 
 

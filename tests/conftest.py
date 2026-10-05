@@ -8,10 +8,10 @@ from thetascout.data.provider import CallChain, DataFetchError
 NOW = datetime(2026, 1, 5, 12, 0, 0)
 
 
-def make_calls(rows: list[dict[str, object]]) -> pd.DataFrame:
+def make_calls(rows: list[dict[str, object]], now: datetime = NOW) -> pd.DataFrame:
     """A raw call chain in the shape a provider returns.
 
-    Each row needs ``strike`` and ``days`` (days from NOW to expiry); other
+    Each row needs ``strike`` and ``days`` (days from ``now`` to expiry); other
     columns get sensible defaults.
     """
     records = []
@@ -26,7 +26,7 @@ def make_calls(rows: list[dict[str, object]]) -> pd.DataFrame:
                 "openInterest": row.get("openInterest", 500),
                 "impliedVolatility": row.get("iv", 0.30),
                 "optionType": row.get("optionType", "call"),
-                "expirationDate": NOW + timedelta(days=float(row["days"])),  # type: ignore[arg-type]
+                "expirationDate": now + timedelta(days=float(row["days"])),  # type: ignore[arg-type]
             }
         )
     return pd.DataFrame(records)

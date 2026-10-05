@@ -9,8 +9,11 @@ import pandas as pd
 
 from thetascout.data.provider import DataFetchError, MarketDataProvider
 from thetascout.data.yahoo import YahooFinanceProvider
-from thetascout.pricing.black_scholes import call_delta
-from thetascout.screening.filters import add_contract_metrics, filter_calls, numeric_column
+from thetascout.screening.filters import (
+    add_assignment_probability,
+    add_contract_metrics,
+    filter_calls,
+)
 
 ProgressCallback = Callable[[float, str], None]
 ScanOne = Callable[[str, int, int], pd.DataFrame]
@@ -50,12 +53,7 @@ def scan_one_ticker(
     if df.empty:
         return pd.DataFrame()
 
-    iv_decimal = numeric_column(df, "impliedVolatility")
-    df["Assignment Prob"] = [
-        call_delta(price, strike, dte / 365.0, iv)
-        for strike, dte, iv in zip(df["Strike"], df["Days to Expiry"], iv_decimal, strict=True)
-    ]
-    return df
+    return add_assignment_probability(df, price)
 
 
 def scan_universe(
