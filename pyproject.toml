@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thetascout"
+version = "0.2.0"
+description = "Covered call screener: option-chain analytics, Black-Scholes pricing and opportunity scoring."
+requires-python = ">=3.11"
+authors = [{ name = "Tomas Pessagno" }]
+dependencies = [
+    "pandas>=2.2",
+    "yfinance>=0.2.40",
+]
+
+[project.optional-dependencies]
+app = [
+    "streamlit>=1.40",
+    "altair>=5",
+    "streamlit-searchbox>=0.1.20",
+]
+dev = [
+    "pytest>=8",
+    "hypothesis>=6",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "pandas-stubs",
+]
+
+[tool.setuptools.packages.find]
+include = ["thetascout*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["streamlit_app.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["thetascout"]
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["yfinance.*"]
+ignore_missing_imports = true
