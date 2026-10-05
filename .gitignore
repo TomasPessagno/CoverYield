@@ -2,3 +2,6 @@
 __pycache__/
 .env
 
+
+# Private working notes
+*.local.md
