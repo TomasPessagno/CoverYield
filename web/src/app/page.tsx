@@ -16,6 +16,7 @@ import { TickerSearch } from "@/components/TickerSearch";
 import { YahooLink } from "@/components/YahooLink";
 import { api, errorMessage, type Contract, type ScreenerResponse, type UniverseTicker } from "@/lib/api";
 import {
+  fmtAgo,
   fmtDate,
   fmtInt,
   fmtPct,
@@ -37,6 +38,10 @@ export default function ScreenerPage() {
   const [maxDays, setMaxDays] = useState<number | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [lastData, setLastData] = useState<ScreenerResponse | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+  // Ticks so "12 min ago" and the refresh countdown stay current.
+  const [now, setNow] = useState(() => Date.now());
 
   // Client-side filters: applied instantly to the loaded chain, no refetch.
   const [minOffset, setMinOffset] = useState(0);
@@ -46,6 +51,8 @@ export default function ScreenerPage() {
 
   useEffect(() => {
     api.universe().then(setUniverse).catch(() => {});
+    const timer = setInterval(() => setNow(Date.now()), 15_000);
+    return () => clearInterval(timer);
   }, []);
 
   const swap = minDays !== null && maxDays !== null && minDays > maxDays;
@@ -63,6 +70,7 @@ export default function ScreenerPage() {
           if (!live) return;
           setResult({ key, data });
           setLastData(data);
+          setNow(Date.now());
         })
         .catch((e: unknown) => live && setResult({ key, error: errorMessage(e) }));
     }, 200);
@@ -75,6 +83,22 @@ export default function ScreenerPage() {
   const loading = key !== null && result?.key !== key;
   const error = result?.key === key ? result.error : undefined;
   const data = error ? null : (result?.key === key ? result.data : lastData) ?? null;
+
+  async function scanNow() {
+    if (!ticker || !key) return;
+    setScanning(true);
+    setScanError(null);
+    try {
+      const fresh = await api.refresh(ticker, lo, hi);
+      setResult({ key, data: fresh });
+      setLastData(fresh);
+    } catch (e) {
+      setScanError(errorMessage(e));
+    } finally {
+      setScanning(false);
+      setNow(Date.now());
+    }
+  }
 
   const contracts =
     data?.contracts.filter(
@@ -108,6 +132,10 @@ export default function ScreenerPage() {
           <QuoteHeader
             data={data}
             loading={loading}
+            now={now}
+            scanning={scanning}
+            scanError={scanError}
+            onScanNow={scanNow}
             summary={[
               expiryLabel(lo, hi),
               `strike +$${minOffset} to ${maxOffset === null ? "no max" : `+$${maxOffset}`}`,
@@ -207,11 +235,29 @@ function QuoteHeader({
   data,
   loading,
   summary,
+  now,
+  scanning,
+  scanError,
+  onScanNow,
 }: {
   data: ScreenerResponse;
   loading: boolean;
   summary: string;
+  now: number;
+  scanning: boolean;
+  scanError: string | null;
+  onScanNow: () => void;
 }) {
+  const waitMs = data.next_refresh_at ? new Date(data.next_refresh_at).getTime() - now : 0;
+  const coolingDown = waitMs > 0;
+  const scanLabel = scanning
+    ? "Scanning…"
+    : coolingDown
+      ? `Available in ${Math.max(1, Math.ceil(waitMs / 60_000))} min`
+      : "Scan now";
+  const scanHint = coolingDown
+    ? `${data.ticker} was refreshed ${fmtAgo(data.as_of, now)}. To keep load on the data source low, each ticker can be refreshed once every 10 minutes; everyone sees the latest copy.`
+    : `Fetch ${data.ticker}'s option chain live now`;
   const change = data.open_price > 0 ? data.price - data.open_price : null;
   const changePct = change !== null ? (change / data.open_price) * 100 : null;
   return (
@@ -223,9 +269,23 @@ function QuoteHeader({
           {change >= 0 ? "▲" : "▼"} {fmtSigned(change)} ({fmtSigned(changePct)}%) today
         </span>
       )}
-      <span className="num hidden text-xs text-muted sm:inline">
-        {loading ? "updating…" : `as of ${fmtTime(data.as_of)}`}
+      <span className="num hidden text-xs text-muted sm:inline" title={new Date(data.as_of).toString()}>
+        {loading ? "updating…" : `data as of ${fmtTime(data.as_of)} · ${fmtAgo(data.as_of, now)}`}
       </span>
+      <button
+        type="button"
+        onClick={onScanNow}
+        disabled={scanning || coolingDown}
+        title={scanHint}
+        className="h-7 rounded-sm border border-border px-3 text-xs text-text-2 transition-colors hover:border-border-strong hover:text-text disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {scanLabel}
+      </button>
+      {(data.stale || scanError) && (
+        <span className="text-xs text-down">
+          {scanError ?? "Live refresh failed, showing the last data"}
+        </span>
+      )}
       <span className="num ml-auto hidden text-xs text-muted md:inline">{summary}</span>
       <a
         href={yahooQuoteUrl(data.ticker)}

@@ -10,6 +10,7 @@ export type ScanTickerResponse = Schemas["ScanTickerResponse"];
 export type TickerMatch = Schemas["TickerMatch"];
 export type UniverseTicker = Schemas["UniverseTicker"];
 export type Weights = Schemas["Weights"];
+export type AppConfig = Schemas["AppConfig"];
 
 export class ApiError extends Error {
   constructor(
@@ -40,18 +41,26 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+function dayParams(minDays: number | null, maxDays: number | null): string {
+  const params = new URLSearchParams();
+  if (minDays !== null) params.set("min_days", String(minDays));
+  if (maxDays !== null) params.set("max_days", String(maxDays));
+  return params.size ? `?${params}` : "";
+}
+
 export const api = {
   universe: () => request<UniverseTicker[]>("/universe"),
   search: (q: string, signal?: AbortSignal) =>
     request<TickerMatch[]>(`/search?q=${encodeURIComponent(q)}`, { signal }),
+  config: () => request<AppConfig>("/config"),
   /** ``null`` days mean no limit on that side of the expiry window. */
-  screener: (ticker: string, minDays: number | null, maxDays: number | null) => {
-    const params = new URLSearchParams();
-    if (minDays !== null) params.set("min_days", String(minDays));
-    if (maxDays !== null) params.set("max_days", String(maxDays));
-    const qs = params.size ? `?${params}` : "";
-    return request<ScreenerResponse>(`/screener/${encodeURIComponent(ticker)}${qs}`);
-  },
+  screener: (ticker: string, minDays: number | null, maxDays: number | null) =>
+    request<ScreenerResponse>(`/screener/${encodeURIComponent(ticker)}${dayParams(minDays, maxDays)}`),
+  /** "Scan now": fetch live unless the ticker is within its refresh cooldown. */
+  refresh: (ticker: string, minDays: number | null, maxDays: number | null) =>
+    request<ScreenerResponse>(`/refresh/${encodeURIComponent(ticker)}${dayParams(minDays, maxDays)}`, {
+      method: "POST",
+    }),
   scanTicker: (ticker: string) =>
     request<ScanTickerResponse>(`/scan/${encodeURIComponent(ticker)}`, { method: "POST" }),
   opportunities: (body: OpportunitiesRequest, signal?: AbortSignal) =>

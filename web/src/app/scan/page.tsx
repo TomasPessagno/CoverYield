@@ -13,7 +13,7 @@ import {
   type Weights,
 } from "@/lib/api";
 import { YahooLink } from "@/components/YahooLink";
-import { fmtDate, fmtInt, fmtPct, fmtUsd } from "@/lib/format";
+import { fmtDate, fmtInt, fmtPct, fmtTime, fmtUsd } from "@/lib/format";
 
 const CONCURRENCY = 4;
 const DEFAULT_WEIGHTS: Weights = { yield: 40, assign: 30, liq: 15, vol: 10, div: 5 };
@@ -197,7 +197,9 @@ export default function ScanPage() {
             <span className="num text-xs text-muted">
               {ranking
                 ? "re-ranking…"
-                : `top ${data.results.length} of ${fmtInt(data.matched)} matches · ${data.scanned} tickers`}
+                : `top ${data.results.length} of ${fmtInt(data.matched)} matches · ${data.scanned} tickers${
+                    data.oldest_data_at ? ` · data as of ${fmtTime(data.oldest_data_at)}` : ""
+                  }`}
             </span>
           }
         >

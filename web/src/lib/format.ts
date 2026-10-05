@@ -17,6 +17,15 @@ export function fmtDate(iso: string): string {
   return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+/** "just now", "12 min ago", "3 h ago", "2 d ago" */
+export function fmtAgo(iso: string, now: number): string {
+  const minutes = Math.floor((now - new Date(iso).getTime()) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 48 * 60) return `${Math.floor(minutes / 60)} h ago`;
+  return `${Math.floor(minutes / 1440)} d ago`;
+}
+
 export function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString("en-US", { hour12: false });
 }
