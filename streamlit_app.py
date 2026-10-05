@@ -13,14 +13,25 @@ Author: Tomas Pessagno
 
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 from streamlit_searchbox import st_searchbox
 import altair as alt
 
 from thetascout.data.provider import DataFetchError
 from thetascout.data.universe import DEFAULT_UNIVERSE, TICKER_MAP
 from thetascout.data.yahoo import YahooFinanceProvider
-from thetascout.pricing.black_scholes import call_delta
+from thetascout.screening.filters import (
+    add_contract_metrics,
+    filter_by_goals,
+    filter_by_strike_and_return,
+    filter_calls,
+)
+from thetascout.screening.scan import scan_one_ticker, scan_universe
+from thetascout.screening.scoring import (
+    compute_opportunity_score,
+    normalize_weights,
+    rank_opportunities,
+)
 
 PROVIDER = YahooFinanceProvider()
 
@@ -73,91 +84,6 @@ st.markdown("""
 
 # Build display labels: "Name (Stock Ticker)"
 TICKER_OPTIONS = [f"{name} ({sym})" for sym, name in TICKER_MAP.items()]
-
-# =============================================================================
-# ETL STEP 2: DATA TRANSFORMATION - Apply Filters and Calculate Metrics
-# =============================================================================
-
-def transform_data(
-    ticker: str,
-    current_price: float,
-    options_df: pd.DataFrame,
-    min_days_to_expiry: int,
-    max_days_to_expiry: int
-) -> pd.DataFrame:
-    """
-    Transform raw options data by applying filters and calculating metrics.
-
-    Steps:
-    1. Filter by expiration date window (min_days to max_days from today)
-    2. Filter out deep ITM options (strike >= 90% of current price)
-    3. Calculate static return percentage
-    4. Filter by minimum target return
-    """
-    if options_df.empty:
-        return pd.DataFrame()
-
-    df = options_df.copy()
-
-    # --------------------------------------------------------------------------
-    # FILTER 1: Expiry Date Window (uses the actual parameters)
-    # --------------------------------------------------------------------------
-    today = datetime.now()
-    min_expiry = today + timedelta(days=min_days_to_expiry)
-    max_expiry = today + timedelta(days=max_days_to_expiry)
-
-    df = df[
-        (df['expirationDate'] >= min_expiry) &
-        (df['expirationDate'] <= max_expiry)
-    ].copy()
-
-    if df.empty:
-        return pd.DataFrame()
-
-    # --------------------------------------------------------------------------
-    # FILTER 2: Keep only calls (safety check — should already be calls only)
-    # --------------------------------------------------------------------------
-    
-    df = df[df['optionType'] == 'call'].copy()
-
-    # --------------------------------------------------------------------------
-    # FILTER 3: Strike price — filter out deep ITM options
-    # --------------------------------------------------------------------------
-
-    df['Strike'] = df['strike'].round(2)
-    min_strike = current_price * 0.90
-    df = df[df['Strike'] >= min_strike].copy()
-
-    # --------------------------------------------------------------------------
-    # CALCULATE: Bid, Ask, Spread, Static Return %
-    # --------------------------------------------------------------------------
-    
-    df['BidPrice'] = pd.to_numeric(
-        df.get('bid', pd.Series(dtype=float)),
-        errors='coerce'
-    ).fillna(0)
-
-    df['AskPrice'] = pd.to_numeric(
-        df.get('ask', pd.Series(dtype=float)),
-        errors='coerce'
-    ).fillna(0)
-
-    df['MidPrice'] = (df['BidPrice'] + df['AskPrice']) / 2
-    df['Spread'] = df['AskPrice'] - df['BidPrice']
-
-    if current_price > 0:
-        df['Static Return %'] = (df['BidPrice'] / current_price) * 100
-    else:
-        df['Static Return %'] = 0.0
-
-    # --------------------------------------------------------------------------
-    # Add ticker column
-    # --------------------------------------------------------------------------
-
-    df['Ticker'] = ticker
-
-    return df
-
 
 # =============================================================================
 # MAIN APP LOGIC
@@ -282,7 +208,7 @@ def screener_tab():
     scan_time_html = f"<span style='font-size: 1.1rem; color: #64748b; margin-left: 15px; font-weight: 400;'>Scanned: {scan_time}</span>" if scan_time else ""
 
     # Transform/filter the data (runs on every rerender so layout changes apply)
-    filtered_df = transform_data(
+    filtered_df = filter_calls(
         ticker=ticker,
         current_price=current_price,
         options_df=options_df,
@@ -388,25 +314,15 @@ def screener_tab():
             key="min_annualized_return_slider"
         )
 
-    # Calculate days to expiry
-    filtered_df['Days to Expiry'] = filtered_df['expirationDate'].apply(
-        lambda x: (x - datetime.now()).days
+    filtered_df = add_contract_metrics(filtered_df, current_price)
+    filtered_df = filter_by_strike_and_return(
+        filtered_df,
+        current_price,
+        min_strike_offset,
+        max_strike_offset,
+        min_static_return,
+        min_annualized_return,
     )
-
-    # Calculate annualized return
-    filtered_df['Annualized Return %'] = filtered_df.apply(
-        lambda r: r['Static Return %'] * (365 / r['Days to Expiry']) if r['Days to Expiry'] > 0 else 0.0,
-        axis=1
-    )
-
-    min_strike = current_price + min_strike_offset
-    max_strike = current_price + max_strike_offset
-    filtered_df = filtered_df[
-        (filtered_df['Strike'] >= min_strike) &
-        (filtered_df['Strike'] <= max_strike) &
-        (filtered_df['Static Return %'] >= min_static_return) &
-        (filtered_df['Annualized Return %'] >= min_annualized_return)
-    ].copy()
 
     if filtered_df.empty:
         st.warning("No options within this strike range. Try widening the offsets.")
@@ -416,25 +332,6 @@ def screener_tab():
     filtered_df['Strike Display'] = filtered_df['Strike'].apply(
         lambda s: f"${s:.2f} (${s - current_price:.2f})"
     )
-
-    # Calculate breakeven price
-    filtered_df['Breakeven Price'] = current_price - filtered_df['BidPrice']
-
-    # Calculate distance to strike
-    filtered_df['Distance to Strike %'] = ((filtered_df['Strike'] - current_price) / current_price) * 100
-
-    # Clean up volume and open interest columns
-    filtered_df['Volume'] = pd.to_numeric(
-        filtered_df.get('volume', pd.Series(dtype=float)), errors='coerce'
-    ).fillna(0).astype(int)
-    filtered_df['Open Interest'] = pd.to_numeric(
-        filtered_df.get('openInterest', pd.Series(dtype=float)), errors='coerce'
-    ).fillna(0).astype(int)
-
-    # Clean up implied volatility
-    filtered_df['IV'] = pd.to_numeric(
-        filtered_df.get('impliedVolatility', pd.Series(dtype=float)), errors='coerce'
-    ).fillna(0) * 100  # Convert to percentage
 
     # Create the specific contract link using the OCC contractSymbol column
     filtered_df['Yahoo Contract'] = "https://finance.yahoo.com/quote/" + filtered_df['contractSymbol']
@@ -768,67 +665,9 @@ CUSTOM_ANALYSIS_UNIVERSE = DEFAULT_UNIVERSE
 
 
 @st.cache_data(ttl=600, show_spinner=False)
-def scan_one_ticker(ticker: str, min_days: int, max_days: int) -> pd.DataFrame:
-    """
-    Fetch + transform a single ticker's calls and enrich with the metrics the
-    scoring engine needs. Cached (10 min TTL) so re-runs and weight tweaks are
-    instant. Returns an empty DataFrame on any failure.
-    """
-    try:
-        chain = PROVIDER.fetch_call_chain(ticker)
-    except DataFetchError:
-        return pd.DataFrame()
-    if chain.is_empty:
-        return pd.DataFrame()
-    price, options_df = chain.price, chain.calls
-
-    df = transform_data(ticker, price, options_df, min_days, max_days)
-    if df.empty:
-        return pd.DataFrame()
-
-    df = df[df['BidPrice'] > 0].copy()  # liquidity gate: drop zero-bid junk
-    if df.empty:
-        return pd.DataFrame()
-
-    df['Current Price'] = price
-    df['Days to Expiry'] = df['expirationDate'].apply(lambda x: (x - datetime.now()).days)
-    df = df[df['Days to Expiry'] > 0].copy()
-    if df.empty:
-        return pd.DataFrame()
-
-    df['Annualized Return %'] = df['Static Return %'] * (365.0 / df['Days to Expiry'])
-    df['Distance to Strike %'] = ((df['Strike'] - price) / price) * 100
-
-    iv_raw = pd.to_numeric(df.get('impliedVolatility', pd.Series(dtype=float)), errors='coerce').fillna(0)
-    df['IV'] = iv_raw * 100
-    df['Volume'] = pd.to_numeric(df.get('volume', pd.Series(dtype=float)), errors='coerce').fillna(0).astype(int)
-    df['Open Interest'] = pd.to_numeric(df.get('openInterest', pd.Series(dtype=float)), errors='coerce').fillna(0).astype(int)
-
-    df['Assignment Prob'] = df.apply(
-        lambda row: call_delta(
-            price, row['Strike'], row['Days to Expiry'] / 365.0, iv_raw.loc[row.name]
-        ),
-        axis=1,
-    )
-    return df
-
-
-def scan_universe(tickers, min_days, max_days, progress_cb=None) -> pd.DataFrame:
-    """Scan a list of tickers and concatenate their enriched option chains."""
-    frames = []
-    total = len(tickers)
-    for i, ticker in enumerate(tickers):
-        try:
-            df = scan_one_ticker(ticker, min_days, max_days)
-        except Exception:
-            df = pd.DataFrame()
-        if not df.empty:
-            frames.append(df)
-        if progress_cb:
-            progress_cb((i + 1) / total, ticker)
-    if not frames:
-        return pd.DataFrame()
-    return pd.concat(frames, ignore_index=True)
+def cached_scan_one_ticker(ticker: str, min_days: int, max_days: int) -> pd.DataFrame:
+    """scan_one_ticker cached for 10 min so re-runs and weight tweaks are instant."""
+    return scan_one_ticker(ticker, min_days, max_days, provider=PROVIDER)
 
 
 def score_gradient(series: pd.Series, vmin: float = 0, vmax: float = 100) -> list[str]:
@@ -842,48 +681,6 @@ def score_gradient(series: pd.Series, vmin: float = 0, vmax: float = 100) -> lis
         text_color = '#000' if ratio < 0.6 else '#fff'
         styles.append(f'background-color: rgb({r},{g},{b}); color: {text_color}')
     return styles
-
-
-def compute_opportunity_score(df: pd.DataFrame, weights: dict) -> pd.DataFrame:
-    """
-    Blend five normalized 0-100 components into a single Opportunity Score.
-
-    weights: dict with keys yield/assign/liq/vol/div (already normalized to sum 1).
-    """
-    out = df.copy()
-
-    # 40% Yield — blend of ACTUAL return (real cash this trade) and annualized
-    # (capital efficiency). Leans on actual by default so the ranking reflects
-    # real money, not a short-DTE-favoring projection. Split is user-tunable.
-    actual_norm = (out['Static Return %'] / 5.0).clip(0, 1) * 100      # 0..5% -> 0..100
-    annual_norm = (out['Annualized Return %'] / 60.0).clip(0, 1) * 100  # 0..60% -> 0..100
-    actual_frac = weights.get('yield_actual_frac', 0.7)
-    out['s_yield'] = actual_frac * actual_norm + (1 - actual_frac) * annual_norm
-
-    # 30% Assignment risk — lower delta (prob. of being called away) = better
-    delta = out['Assignment Prob'].fillna(0.5)
-    out['s_assign'] = (1 - delta).clip(0, 1) * 100
-
-    # 15% Liquidity — open interest + volume, penalize wide spreads
-    oi = (out['Open Interest'] / 500.0).clip(0, 1)
-    vol = (out['Volume'] / 200.0).clip(0, 1)
-    spread_quality = 1 - (out['Spread'] / 0.5).clip(0, 1)
-    out['s_liq'] = (oi * 0.5 + vol * 0.3 + spread_quality * 0.2) * 100
-
-    # 10% Volatility — reward moderate IV (~30%), penalize extremes
-    out['s_vol'] = (100 - (out['IV'] - 30).abs() * 1.5).clip(0, 100)
-
-    # 5% Dividend — placeholder neutral (ex-div timing is a v2 item)
-    out['s_div'] = 50.0
-
-    out['Opportunity Score'] = (
-        weights['yield'] * out['s_yield']
-        + weights['assign'] * out['s_assign']
-        + weights['liq'] * out['s_liq']
-        + weights['vol'] * out['s_vol']
-        + weights['div'] * out['s_div']
-    )
-    return out
 
 
 def custom_analysis_tab():
@@ -960,12 +757,10 @@ def custom_analysis_tab():
     run = st.button("Find Opportunities", type="primary", key="ca_run_button")
 
     # Weights are read from the current sliders and applied LIVE on every rerun.
-    weight_total = max(w_yield + w_assign + w_liq + w_vol + w_div, 1)
-    weights = {
-        'yield': w_yield / weight_total, 'assign': w_assign / weight_total,
-        'liq': w_liq / weight_total, 'vol': w_vol / weight_total, 'div': w_div / weight_total,
-        'yield_actual_frac': yield_actual_pct / 100.0,
-    }
+    weights = normalize_weights(
+        {'yield': w_yield, 'assign': w_assign, 'liq': w_liq, 'vol': w_vol, 'div': w_div},
+        yield_actual_frac=yield_actual_pct / 100.0,
+    )
 
     # The SCAN (slow) only runs on button click. Its raw result is stashed in
     # session state, so the goal filters + weights below re-apply instantly on
@@ -978,7 +773,10 @@ def custom_analysis_tab():
             progress.progress(frac, text=f"Scanning {ticker}... ({int(frac * 100)}%)")
 
         # Scan a wide DTE window (1-120d) so Max-DTE becomes a live filter too.
-        scanned = scan_universe(tickers, min_days=1, max_days=120, progress_cb=_update)
+        scanned = scan_universe(
+            tickers, min_days=1, max_days=120, progress_cb=_update,
+            scan_one=cached_scan_one_ticker,
+        )
         progress.empty()
         st.session_state.ca_scanned = scanned if not scanned.empty else None
         st.session_state.ca_scanned_count = len(tickers)
@@ -990,11 +788,7 @@ def custom_analysis_tab():
 
     # ---- Filter + score LIVE (re-runs on any widget change, no re-scan) ----
     scanned_count = st.session_state.get('ca_scanned_count', '?')
-    filtered = scanned[
-        (scanned['Static Return %'] >= min_static)
-        & (scanned['Days to Expiry'] <= max_dte)
-        & (scanned['Distance to Strike %'] >= min_otm)
-    ].copy()
+    filtered = filter_by_goals(scanned, min_static, max_dte, min_otm)
 
     if filtered.empty:
         st.warning(
@@ -1004,8 +798,7 @@ def custom_analysis_tab():
         )
         return
 
-    scored = compute_opportunity_score(filtered, weights)
-    scored = scored.sort_values('Opportunity Score', ascending=False).head(top_n)
+    scored = rank_opportunities(compute_opportunity_score(filtered, weights), top_n)
 
     st.success(
         f"Top **{len(scored)}** of **{len(filtered)}** matching opportunities across "
