@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,6 +7,8 @@ name = "thetascout"
 version = "0.2.0"
 description = "Covered call screener: option-chain analytics, Black-Scholes pricing and opportunity scoring."
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Tomas Pessagno" }]
 dependencies = [
     "pandas>=2.2",
