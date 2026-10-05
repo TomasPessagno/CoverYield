@@ -37,3 +37,11 @@ def test_cache_does_not_store_failures() -> None:
         cache.fetch_call_chain("BAD")
     inner.failing.clear()
     assert cache.fetch_call_chain("BAD").is_empty  # retried, not a cached error
+
+
+def test_cache_does_not_store_empty_chains() -> None:
+    inner = FakeProvider({})  # unknown tickers come back empty
+    cache = CachedProvider(inner)
+    assert cache.fetch_call_chain("AAA").is_empty
+    inner.chains["AAA"] = CallChain("AAA", 100.0, 99.0, pd.DataFrame({"x": [1]}))
+    assert not cache.fetch_call_chain("AAA").is_empty  # refetched, not a cached empty

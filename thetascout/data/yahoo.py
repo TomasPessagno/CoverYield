@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 import pandas as pd
 import yfinance as yf
 
@@ -11,13 +13,21 @@ from thetascout.data.provider import CallChain, DataFetchError
 class YahooFinanceProvider:
     """MarketDataProvider backed by yfinance (free, unofficial, rate-limited)."""
 
+    def __init__(self, retry_delay_seconds: float = 0.5) -> None:
+        self._retry_delay = retry_delay_seconds
+
     def fetch_call_chain(self, ticker: str) -> CallChain:
         """Extract raw CALL options data for every listed expiration of ``ticker``."""
         try:
             ticker_obj = yf.Ticker(ticker)
 
-            # Get all available expiration dates
+            # Get all available expiration dates. yfinance reports network errors
+            # as "no expirations", so retry once before concluding there are none.
             expirations = ticker_obj.options
+            if not expirations:
+                time.sleep(self._retry_delay)
+                ticker_obj = yf.Ticker(ticker)
+                expirations = ticker_obj.options
             if not expirations:
                 return CallChain(ticker, 0.0, 0.0, pd.DataFrame())
 

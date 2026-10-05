@@ -16,7 +16,9 @@ class CachedProvider:
 
     Option chains change slowly enough for a screener that refetching the same
     ticker within a few minutes is wasted work (and gets you rate-limited).
-    Failed fetches are not cached. Ticker search is passed through uncached.
+    Failed fetches and empty chains are not cached: an empty result is often a
+    transient upstream glitch, and a real "no options" answer is cheap to re-check.
+    Ticker search is passed through uncached.
     """
 
     def __init__(
@@ -39,8 +41,9 @@ class CachedProvider:
         if hit is not None and now - hit[0] < self._ttl:
             return hit[1]
         chain = self._inner.fetch_call_chain(key)
-        with self._lock:
-            self._chains[key] = (now, chain)
+        if not chain.is_empty:
+            with self._lock:
+                self._chains[key] = (now, chain)
         return chain
 
     def search_tickers(self, query: str) -> list[tuple[str, str]]:
