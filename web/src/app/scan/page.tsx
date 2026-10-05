@@ -12,7 +12,8 @@ import {
   type UniverseTicker,
   type Weights,
 } from "@/lib/api";
-import { fmtDate, fmtInt, fmtPct, fmtUsd, yahooQuoteUrl } from "@/lib/format";
+import { YahooLink } from "@/components/YahooLink";
+import { fmtDate, fmtInt, fmtPct, fmtUsd } from "@/lib/format";
 
 const CONCURRENCY = 4;
 const DEFAULT_WEIGHTS: Weights = { yield: 40, assign: 30, liq: 15, vol: 10, div: 5 };
@@ -133,7 +134,7 @@ export default function ScanPage() {
           <summary className="label flex cursor-pointer list-none items-center gap-2 px-4 py-2.5 hover:text-text-2">
             <span className="transition-transform group-open:rotate-90">▸</span>
             Scoring weights
-            <span className="num normal-case tracking-normal text-muted">
+            <span className="num text-muted">
               {WEIGHT_LABELS.map(([k]) => Math.round((weights[k] / weightTotal) * 100)).join(" / ")}
             </span>
           </summary>
@@ -255,7 +256,7 @@ const OPPORTUNITY_COLUMNS: Column<Opportunity>[] = [
     header: "Ticker",
     align: "left",
     value: (o) => o.ticker,
-    render: (o) => <span className="text-accent">{o.ticker}</span>,
+    render: (o) => <span className="font-medium text-text">{o.ticker}</span>,
   },
   { key: "price", header: "Price", value: (o) => o.price, render: (o) => fmtUsd(o.price) },
   { key: "strike", header: "Strike", value: (o) => o.strike, render: (o) => fmtUsd(o.strike) },
@@ -284,12 +285,9 @@ const OPPORTUNITY_COLUMNS: Column<Opportunity>[] = [
   {
     key: "contract",
     header: "Contract",
-    align: "left",
-    value: (o) => o.contract_symbol,
-    render: (o) => (
-      <a href={yahooQuoteUrl(o.contract_symbol)} target="_blank" rel="noreferrer" className="text-muted hover:text-accent">
-        {o.contract_symbol}
-      </a>
-    ),
+    hint: "Open this exact contract on Yahoo Finance",
+    sortable: false,
+    value: () => null,
+    render: (o) => <YahooLink contractSymbol={o.contract_symbol} />,
   },
 ];

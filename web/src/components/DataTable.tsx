@@ -79,7 +79,7 @@ export function DataTable<T>({
                     type="button"
                     onClick={() => toggle(c.key)}
                     className={`label inline-flex items-center gap-1 hover:text-text-2 ${
-                      active ? "text-accent" : ""
+                      active ? "text-text" : ""
                     } ${c.hint ? "decoration-dotted underline-offset-4 hover:underline" : ""}`}
                   >
                     {c.header}
@@ -106,7 +106,7 @@ export function DataTable<T>({
                     }`}
                     style={
                       h !== undefined && h > 0
-                        ? { backgroundColor: `rgb(255 160 40 / ${(0.03 + h * 0.2).toFixed(3)})` }
+                        ? { backgroundColor: `rgb(var(--heat-rgb) / ${(0.02 + h * 0.11).toFixed(3)})` }
                         : undefined
                     }
                   >

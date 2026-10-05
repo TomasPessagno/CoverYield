@@ -5,22 +5,12 @@ import { useEffect, useRef, useState, type MouseEvent } from "react";
 import type { Contract } from "@/lib/api";
 import { fmtDate, fmtInt, fmtPct, fmtUsd } from "@/lib/format";
 
-// Sequential ramp (one hue, dim -> bright on the dark surface) for implied volatility.
-const IV_RAMP = ["#6e4610", "#9a610f", "#c87d10", "#f29a24", "#ffc06a"];
+// Sequential one-hue ramp for implied volatility, defined per theme in globals.css.
+const IV_STEPS = 5;
+const ivColor = (t: number) =>
+  `var(--iv-${Math.min(IV_STEPS - 1, Math.max(0, Math.floor(t * IV_STEPS)))})`;
 const HEIGHT = 380;
 const M = { top: 22, right: 24, bottom: 40, left: 52 };
-
-function lerpColor(a: string, b: string, t: number): string {
-  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16));
-  const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
-  return `rgb(${pa.map((v, i) => Math.round(v + (pb[i] - v) * t)).join(",")})`;
-}
-
-function rampColor(t: number): string {
-  const x = Math.min(Math.max(t, 0), 1) * (IV_RAMP.length - 1);
-  const i = Math.min(Math.floor(x), IV_RAMP.length - 2);
-  return lerpColor(IV_RAMP[i], IV_RAMP[i + 1], x - i);
-}
 
 function niceTicks(lo: number, hi: number, count = 5): number[] {
   const span = hi - lo || 1;
@@ -71,7 +61,7 @@ export function RiskRewardChart({ contracts }: { contracts: Contract[] }) {
   const sx = (v: number) => M.left + ((v - x0) / (x1 - x0)) * iw;
   const sy = (v: number) => M.top + ih - ((v - y0) / (y1 - y0)) * ih;
   const sr = (oi: number) => 5 + Math.sqrt(oi / oiMax) * 12;
-  const sc = (iv: number) => rampColor(ivHi > ivLo ? (iv - ivLo) / (ivHi - ivLo) : 0.5);
+  const sc = (iv: number) => ivColor(ivHi > ivLo ? (iv - ivLo) / (ivHi - ivLo) : 0.5);
 
   // Draw big dots first so small ones stay visible on top.
   const order = contracts
@@ -126,7 +116,7 @@ export function RiskRewardChart({ contracts }: { contracts: Contract[] }) {
             </text>
           </g>
         ))}
-        <line x1={M.left} x2={width - M.right} y1={sy(0)} y2={sy(0)} stroke="#383c43" />
+        <line x1={M.left} x2={width - M.right} y1={sy(0)} y2={sy(0)} stroke="var(--border-strong)" />
         <text x={M.left + iw / 2} y={HEIGHT - 6} textAnchor="middle" className="label fill-muted">
           Distance to strike (safety) →
         </text>
@@ -203,7 +193,9 @@ export function RiskRewardChart({ contracts }: { contracts: Contract[] }) {
           <span className="num">{fmtPct(ivLo, 0)}</span>
           <span
             className="h-2 w-28 rounded-[1px]"
-            style={{ background: `linear-gradient(to right, ${IV_RAMP.join(",")})` }}
+            style={{
+              background: `linear-gradient(to right, ${Array.from({ length: IV_STEPS }, (_, i) => `var(--iv-${i})`).join(",")})`,
+            }}
           />
           <span className="num">{fmtPct(ivHi, 0)}</span>
         </span>

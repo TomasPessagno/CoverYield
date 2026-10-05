@@ -6,6 +6,7 @@ import { DataTable, type Column } from "@/components/DataTable";
 import { ErrorNote, Field, NumberInput, Panel, SliderInput } from "@/components/fields";
 import { RiskRewardChart } from "@/components/RiskRewardChart";
 import { TickerSearch } from "@/components/TickerSearch";
+import { YahooLink } from "@/components/YahooLink";
 import { api, errorMessage, type Contract, type ScreenerResponse, type UniverseTicker } from "@/lib/api";
 import {
   fmtDate,
@@ -164,7 +165,7 @@ function Intro({ onPick }: { onPick: (t: string) => void }) {
               key={t}
               type="button"
               onClick={() => onPick(t)}
-              className="num rounded-sm border border-border px-3 py-1.5 text-sm text-text-2 transition-colors hover:border-accent hover:text-accent"
+              className="num rounded-sm border border-border px-3 py-1.5 text-sm text-text-2 transition-colors hover:border-border-strong hover:text-text"
             >
               {t}
             </button>
@@ -180,7 +181,7 @@ function QuoteHeader({ data, loading }: { data: ScreenerResponse; loading: boole
   const changePct = change !== null ? (change / data.open_price) * 100 : null;
   return (
     <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 border-b border-border pb-3">
-      <h1 className="num text-2xl font-semibold tracking-wide">{data.ticker}</h1>
+      <h1 className="text-2xl font-semibold tracking-tight">{data.ticker}</h1>
       <span className="num text-2xl">{fmtUsd(data.price)}</span>
       {change !== null && changePct !== null && (
         <span className={`num text-sm ${change >= 0 ? "text-up" : "text-down"}`}>
@@ -194,7 +195,7 @@ function QuoteHeader({ data, loading }: { data: ScreenerResponse; loading: boole
         href={yahooQuoteUrl(data.ticker)}
         target="_blank"
         rel="noreferrer"
-        className="label ml-auto hover:text-accent"
+        className="ml-auto text-xs text-muted hover:text-text"
       >
         Yahoo ↗
       </a>
@@ -202,7 +203,7 @@ function QuoteHeader({ data, loading }: { data: ScreenerResponse; loading: boole
         href={`https://www.tradingview.com/symbols/${encodeURIComponent(data.ticker)}/`}
         target="_blank"
         rel="noreferrer"
-        className="label hover:text-accent"
+        className="text-xs text-muted hover:text-text"
       >
         TradingView ↗
       </a>
@@ -299,21 +300,11 @@ function screenerColumns(price: number): Column<Contract>[] {
     { key: "oi", header: "OI", hint: "Open interest", value: (c) => c.open_interest, render: (c) => fmtInt(c.open_interest) },
     {
       key: "link",
-      header: "",
-      hint: "Open the contract on Yahoo Finance",
+      header: "Contract",
+      hint: "Open this exact contract on Yahoo Finance",
       sortable: false,
       value: () => null,
-      render: (c) => (
-        <a
-          href={yahooQuoteUrl(c.contract_symbol)}
-          target="_blank"
-          rel="noreferrer"
-          title={`${c.contract_symbol} on Yahoo Finance`}
-          className="text-muted hover:text-accent"
-        >
-          ↗
-        </a>
-      ),
+      render: (c) => <YahooLink contractSymbol={c.contract_symbol} />,
     },
   ];
 }

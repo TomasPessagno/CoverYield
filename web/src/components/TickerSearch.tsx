@@ -78,7 +78,7 @@ export function TickerSearch({
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"
-        className="num h-9 w-full rounded-sm border border-border bg-panel px-2.5 text-sm text-text uppercase outline-none placeholder:text-muted placeholder:normal-case hover:border-[#2e333a] focus:border-accent"
+        className="num h-9 w-full rounded-sm border border-border bg-panel px-2.5 text-sm text-text uppercase outline-none placeholder:text-muted placeholder:normal-case hover:border-border-strong focus:border-accent"
         placeholder="Ticker or company, e.g. AAPL"
         value={query}
         spellCheck={false}
@@ -122,10 +122,10 @@ export function TickerSearch({
               }}
               onMouseEnter={() => setActive(i)}
               className={`flex cursor-pointer items-baseline gap-3 px-2.5 py-1.5 text-sm ${
-                i === active ? "bg-accent/10" : ""
+                i === active ? "bg-panel-2" : ""
               }`}
             >
-              <span className="num w-20 shrink-0 text-accent">{o.symbol}</span>
+              <span className="num w-20 shrink-0 font-medium text-text">{o.symbol}</span>
               <span className="truncate text-text-2">{o.label}</span>
             </li>
           ))}

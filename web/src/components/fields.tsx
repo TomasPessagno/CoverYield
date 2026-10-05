@@ -22,7 +22,7 @@ export function Field({
 }
 
 const inputClass =
-  "num h-9 w-full rounded-sm border border-border bg-panel px-2.5 text-sm text-text outline-none transition-colors hover:border-[#2e333a] focus:border-accent";
+  "num h-9 w-full rounded-sm border border-border bg-panel px-2.5 text-sm text-text outline-none transition-colors hover:border-border-strong focus:border-accent";
 
 export function NumberInput({
   value,
@@ -108,14 +108,14 @@ export function Button({
 }) {
   const styles =
     variant === "primary"
-      ? "bg-accent text-black hover:bg-[#ffb04d] disabled:bg-accent-dim disabled:text-black/60"
-      : "border border-border text-text-2 hover:border-[#2e333a] hover:text-text disabled:opacity-50";
+      ? "bg-accent text-accent-ink hover:opacity-85 disabled:opacity-40"
+      : "border border-border text-text-2 hover:border-border-strong hover:text-text disabled:opacity-50";
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`h-9 shrink-0 rounded-sm px-4 font-mono text-xs font-semibold tracking-[0.12em] uppercase transition-colors disabled:cursor-not-allowed ${styles}`}
+      className={`h-9 shrink-0 rounded-sm px-4 text-sm font-medium transition-colors disabled:cursor-not-allowed ${styles}`}
     >
       {children}
     </button>
