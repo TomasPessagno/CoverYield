@@ -12,13 +12,17 @@ Author: Tomas Pessagno
 """
 
 import streamlit as st
-import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 from streamlit_searchbox import st_searchbox
 import altair as alt
 
+from thetascout.data.provider import DataFetchError
+from thetascout.data.universe import DEFAULT_UNIVERSE, TICKER_MAP
+from thetascout.data.yahoo import YahooFinanceProvider
 from thetascout.pricing.black_scholes import call_delta
+
+PROVIDER = YahooFinanceProvider()
 
 
 # =============================================================================
@@ -67,167 +71,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Popular tickers for covered call screening (high-volume, liquid options)
-# Format: {symbol: company_name}
-TICKER_MAP = {
-    "AAPL": "Apple Inc.",
-    "MSFT": "Microsoft Corp.",
-    "GOOGL": "Alphabet Inc.",
-    "AMZN": "Amazon.com Inc.",
-    "META": "Meta Platforms Inc.",
-    "NVDA": "NVIDIA Corp.",
-    "TSLA": "Tesla Inc.",
-    "AMD": "Advanced Micro Devices",
-    "INTC": "Intel Corp.",
-    "NFLX": "Netflix Inc.",
-    "DIS": "Walt Disney Co.",
-    "BA": "Boeing Co.",
-    "JPM": "JPMorgan Chase & Co.",
-    "V": "Visa Inc.",
-    "MA": "Mastercard Inc.",
-    "WMT": "Walmart Inc.",
-    "KO": "Coca-Cola Co.",
-    "PEP": "PepsiCo Inc.",
-    "JNJ": "Johnson & Johnson",
-    "PFE": "Pfizer Inc.",
-    "XOM": "Exxon Mobil Corp.",
-    "CVX": "Chevron Corp.",
-    "MRK": "Merck & Co.",
-    "ABBV": "AbbVie Inc.",
-    "UNH": "UnitedHealth Group",
-    "HD": "Home Depot Inc.",
-    "MCD": "McDonald's Corp.",
-    "CRM": "Salesforce Inc.",
-    "ORCL": "Oracle Corp.",
-    "CSCO": "Cisco Systems",
-    "QCOM": "Qualcomm Inc.",
-    "AVGO": "Broadcom Inc.",
-    "TXN": "Texas Instruments",
-    "COST": "Costco Wholesale",
-    "SBUX": "Starbucks Corp.",
-    "NKE": "Nike Inc.",
-    "LOW": "Lowe's Companies",
-    "T": "AT&T Inc.",
-    "VZ": "Verizon Communications",
-    "UBER": "Uber Technologies",
-    "PYPL": "PayPal Holdings",
-    "SQ": "Block Inc.",
-    "SNAP": "Snap Inc.",
-    "COIN": "Coinbase Global",
-    "PLTR": "Palantir Technologies",
-    "SOFI": "SoFi Technologies",
-    "RIVN": "Rivian Automotive",
-    "LCID": "Lucid Group",
-    "SPY": "SPDR S&P 500 ETF",
-    "QQQ": "Invesco QQQ Trust",
-    "IWM": "iShares Russell 2000",
-    "DIA": "SPDR Dow Jones ETF",
-    "EEM": "iShares MSCI Emerging",
-    "XLF": "Financial Select SPDR",
-    "XLE": "Energy Select SPDR",
-    "XLK": "Technology Select SPDR",
-}
-
 # Build display labels: "Name (Stock Ticker)"
 TICKER_OPTIONS = [f"{name} ({sym})" for sym, name in TICKER_MAP.items()]
-
-# Reverse lookup: map lowercase company names and symbols to ticker symbols
-TICKER_LOOKUP = {}
-for sym, name in TICKER_MAP.items():
-    TICKER_LOOKUP[sym.lower()] = sym
-    TICKER_LOOKUP[name.lower()] = sym
-
-
-def search_yfinance_tickers(query: str) -> list[tuple[str, str]]:
-    """
-    Search Yahoo Finance for tickers matching the query string.
-    Returns a list of (display_label, ticker_symbol) tuples for the searchbox.
-    """
-    if not query or len(query) < 1:
-        return []
-
-    try:
-        results = yf.Search(query, max_results=10)
-        suggestions = []
-        for quote in results.quotes:
-            symbol = quote.get('symbol', '')
-            name = quote.get('shortname', quote.get('longname', ''))
-            exchange = quote.get('exchange', '')
-            quote_type = quote.get('quoteType', '')
-
-            label_parts = [symbol]
-            if name:
-                label_parts.append(f"— {name}")
-            if exchange:
-                label_parts.append(f"({exchange})")
-            if quote_type and quote_type not in ('EQUITY',):
-                label_parts.append(f"[{quote_type}]")
-
-            label = " ".join(label_parts)
-            suggestions.append((label, symbol))
-
-        return suggestions
-    except Exception:
-        return []
-
-
-# =============================================================================
-# ETL STEP 1: DATA EXTRACTION - Fetch options data via yfinance
-# =============================================================================
-
-def fetch_stock_data(ticker: str, quiet: bool = False) -> tuple[str, float, pd.DataFrame]:
-    """
-    Extract raw CALL options data for a given ticker using yfinance.
-
-    Args:
-        quiet: when True, suppress st.error popups (used by the universe scan
-               where per-ticker failures are expected and handled in bulk).
-
-    Returns:
-        tuple: (ticker, current_price, open_price, calls_df) or (ticker, 0.0, 0.0, empty_df) on error
-    """
-    try:
-        ticker_obj = yf.Ticker(ticker)
-
-        # Get all available expiration dates
-        expirations = ticker_obj.options
-        if not expirations:
-            return ticker, 0.0, 0.0, pd.DataFrame()
-
-        # Fetch CALL options for each expiration date
-        all_calls = []
-        for exp in expirations:
-            try:
-                opt_chain = ticker_obj.option_chain(exp)
-                if opt_chain.calls is not None and len(opt_chain.calls) > 0:
-                    calls = opt_chain.calls.copy()
-                    calls['optionType'] = 'call'
-                    calls['expirationDate'] = exp
-                    all_calls.append(calls)
-            except Exception:
-                continue
-
-        if not all_calls:
-            return ticker, 0.0, 0.0, pd.DataFrame()
-
-        # Combine all call options
-        options_df = pd.concat(all_calls, ignore_index=True)
-
-        # Get current stock price and today's open
-        info = ticker_obj.info
-        current_price = float(info.get('regularMarketPrice', 0))
-        open_price = float(info.get('regularMarketOpen', info.get('open', 0)))
-
-        # Convert expiration dates to datetime
-        options_df['expirationDate'] = pd.to_datetime(options_df['expirationDate'])
-
-        return ticker, current_price, open_price, options_df
-
-    except Exception as e:
-        if not quiet:
-            st.error(f"Error fetching data for {ticker}: {str(e)}")
-        return ticker, 0.0, 0.0, pd.DataFrame()
-
 
 # =============================================================================
 # ETL STEP 2: DATA TRANSFORMATION - Apply Filters and Calculate Metrics
@@ -334,7 +179,7 @@ def screener_tab():
 
     with cfg_col1:
         selected_ticker = st_searchbox(
-            search_yfinance_tickers,
+            PROVIDER.search_tickers,
             label="Stock Ticker",
             placeholder="Search any ticker...",
             key="ticker_searchbox",
@@ -392,17 +237,21 @@ def screener_tab():
             st.stop()
 
         with st.spinner(f"Fetching options data for {ticker}..."):
-            result = fetch_stock_data(ticker)
+            try:
+                chain = PROVIDER.fetch_call_chain(ticker)
+            except DataFetchError as e:
+                st.error(f"Error fetching data for {ticker}: {e}")
+                chain = None
 
-        raw_ticker, current_price, open_price, options_df = result
-
-        if current_price == 0.0 or options_df.empty:
+        if chain is None or chain.is_empty:
             st.error(
                 f"Could not fetch data for ticker '{ticker}'. "
                 "Please verify the symbol is valid."
             )
             st.session_state.cached_data = None
             st.stop()
+
+        current_price, open_price, options_df = chain.price, chain.open_price, chain.calls
 
         # Cache the raw data in session state
         st.session_state.cached_data = {
@@ -915,7 +764,7 @@ def screener_tab():
 
 
 # The prototype universe = the curated liquid-options tickers we already ship.
-CUSTOM_ANALYSIS_UNIVERSE = list(TICKER_MAP.keys())
+CUSTOM_ANALYSIS_UNIVERSE = DEFAULT_UNIVERSE
 
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -925,9 +774,13 @@ def scan_one_ticker(ticker: str, min_days: int, max_days: int) -> pd.DataFrame:
     scoring engine needs. Cached (10 min TTL) so re-runs and weight tweaks are
     instant. Returns an empty DataFrame on any failure.
     """
-    _, price, _, options_df = fetch_stock_data(ticker, quiet=True)
-    if price <= 0 or options_df.empty:
+    try:
+        chain = PROVIDER.fetch_call_chain(ticker)
+    except DataFetchError:
         return pd.DataFrame()
+    if chain.is_empty:
+        return pd.DataFrame()
+    price, options_df = chain.price, chain.calls
 
     df = transform_data(ticker, price, options_df, min_days, max_days)
     if df.empty:
