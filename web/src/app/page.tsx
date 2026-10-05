@@ -103,7 +103,17 @@ export default function ScreenerPage() {
 
       {data && (
         <>
-          <QuoteHeader data={data} loading={loading} />
+          <QuoteHeader
+            data={data}
+            loading={loading}
+            summary={[
+              `${lo}–${hi}d`,
+              `strike +$${minOffset} to ${maxOffset === null ? "no max" : `+$${maxOffset}`}`,
+              ...(minStatic > 0 ? [`static ≥ ${fmtPct(minStatic, 1)}`] : []),
+              ...(minAnnual > 0 ? [`annual ≥ ${fmtPct(minAnnual, 0)}`] : []),
+              `${contracts.length} contracts`,
+            ].join(" · ")}
+          />
 
           <Panel
             title="Filtered options chain"
@@ -190,11 +200,20 @@ function Intro({ onPick }: { onPick: (t: string) => void }) {
   );
 }
 
-function QuoteHeader({ data, loading }: { data: ScreenerResponse; loading: boolean }) {
+/** Stays pinned under the top bar while scrolling, with a one-line summary of the filters. */
+function QuoteHeader({
+  data,
+  loading,
+  summary,
+}: {
+  data: ScreenerResponse;
+  loading: boolean;
+  summary: string;
+}) {
   const change = data.open_price > 0 ? data.price - data.open_price : null;
   const changePct = change !== null ? (change / data.open_price) * 100 : null;
   return (
-    <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 border-b border-border pb-3">
+    <div className="sticky top-12 z-10 -mx-4 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-b border-border bg-bg/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6">
       <h1 className="text-2xl font-semibold tracking-tight">{data.ticker}</h1>
       <span className="num text-2xl">{fmtUsd(data.price)}</span>
       {change !== null && changePct !== null && (
@@ -202,14 +221,15 @@ function QuoteHeader({ data, loading }: { data: ScreenerResponse; loading: boole
           {change >= 0 ? "▲" : "▼"} {fmtSigned(change)} ({fmtSigned(changePct)}%) today
         </span>
       )}
-      <span className="num text-xs text-muted">
+      <span className="num hidden text-xs text-muted sm:inline">
         {loading ? "updating…" : `as of ${fmtTime(data.as_of)}`}
       </span>
+      <span className="num ml-auto hidden text-xs text-muted md:inline">{summary}</span>
       <a
         href={yahooQuoteUrl(data.ticker)}
         target="_blank"
         rel="noreferrer"
-        className="ml-auto text-xs text-muted hover:text-text"
+        className="hidden text-xs text-muted hover:text-text sm:inline"
       >
         Yahoo ↗
       </a>
@@ -217,7 +237,7 @@ function QuoteHeader({ data, loading }: { data: ScreenerResponse; loading: boole
         href={`https://www.tradingview.com/symbols/${encodeURIComponent(data.ticker)}/`}
         target="_blank"
         rel="noreferrer"
-        className="text-xs text-muted hover:text-text"
+        className="hidden text-xs text-muted hover:text-text sm:inline"
       >
         TradingView ↗
       </a>
