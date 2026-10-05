@@ -1,2 +1,6 @@
 [theme]
 base = "light"
+
+[client]
+# Hide Streamlit's developer toolbar (Deploy button and the ⋮ menu)
+toolbarMode = "minimal"
