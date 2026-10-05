@@ -72,6 +72,35 @@ st.markdown("""
         font-weight: 700 !important;
     }
 
+    /* Field labels drawn by field_label(), so every input in a row lines up
+       (the searchbox component renders its own, differently sized label) */
+    .ts-field-label {
+        font-size: 14px;
+        line-height: 1.6;
+        color: rgb(49, 51, 63);
+        margin: 0;
+    }
+
+    /* Min / Max captions at the ends of the Table Size slider */
+    .ts-slider-end {
+        text-align: center;
+        font-size: 0.7rem;
+        color: #aaa;
+        padding-top: 37px;  /* level with the slider track, below its label and value */
+    }
+
+    /* Center the Table Size slider's label over the slider */
+    .st-key-table_scale_slider [data-testid="stWidgetLabel"] {
+        width: 100%;
+        justify-content: center;
+        position: relative;
+    }
+    /* Keep its help icon at the far right without pushing the text off-center */
+    .st-key-table_scale_slider [data-testid="stWidgetLabel"] > div {
+        position: absolute;
+        right: 0;
+    }
+
     /* Grid borders for dataframe */
     .stDataFrame [data-testid="stDataFrameResizable"] {
         border: 1px solid #d1d5db;
@@ -89,6 +118,11 @@ TICKER_OPTIONS = [f"{name} ({sym})" for sym, name in TICKER_MAP.items()]
 # MAIN APP LOGIC
 # =============================================================================
 
+def field_label(text: str) -> None:
+    """Render a widget label with one shared style, so inputs in a row line up."""
+    st.markdown(f"<p class='ts-field-label'>{text}</p>", unsafe_allow_html=True)
+
+
 def screener_tab():
     """
     Renders the single-ticker covered call screener.
@@ -104,12 +138,13 @@ def screener_tab():
     cfg_col1, cfg_col2, cfg_col3 = st.columns(3)
 
     with cfg_col1:
+        field_label("Stock Ticker")
         selected_ticker = st_searchbox(
             PROVIDER.search_tickers,
-            label="Stock Ticker",
             placeholder="Search any ticker...",
             key="ticker_searchbox",
             clear_on_submit=False,
+            style_overrides={"searchbox": {"control": {"minHeight": "40px"}}},
         )
         ticker_selection = st.selectbox(
             "preset",
@@ -121,21 +156,25 @@ def screener_tab():
         )
 
     with cfg_col2:
+        field_label("Min Days to Expiry")
         min_days = st.number_input(
             "Min Days to Expiry",
             min_value=1,  # Lowered min_value slightly to allow 1-DTE strategies if the user desires
             max_value=60,
             value=7,
-            key="min_days_input"
+            key="min_days_input",
+            label_visibility="collapsed",
         )
 
     with cfg_col3:
+        field_label("Max Days to Expiry")
         max_days = st.number_input(
             "Max Days to Expiry",
             min_value=14,
             max_value=90,
             value=42,
-            key="max_days_input"
+            key="max_days_input",
+            label_visibility="collapsed",
         )
 
     scan_clicked = st.button("Scan Options", type="primary", key="scan_button")
@@ -487,17 +526,15 @@ def screener_tab():
 
     # The physical st.dataframe configuration block automatically handles all column renaming!
     # --- Table zoom slider + compact toggle ---
-    _, slider_col, check_col = st.columns([3, 4, 2])
-    with slider_col:
-        min_col, mid_col, max_col = st.columns([1, 8, 1])
-        min_col.markdown("<div style='text-align:center; font-size:0.7rem; color:#aaa; padding-top:4px;'>Min</div>", unsafe_allow_html=True)
-        max_col.markdown("<div style='text-align:center; font-size:0.7rem; color:#aaa; padding-top:4px;'>Max</div>", unsafe_allow_html=True)
-        with mid_col:
-            table_scale_pct = st.slider(
-                "Table Size", min_value=60, max_value=140, value=100, step=5,
-                format="%d%%", key="table_scale_slider",
-                help="If not all columns are visible on your screen, use your browser's zoom: Ctrl + (−) to zoom out, Ctrl + (+) to zoom in. On Mac, use ⌘ instead of Ctrl."
-            )
+    _, min_col, mid_col, max_col, check_col = st.columns([3, 0.6, 4, 0.6, 3])
+    min_col.markdown("<div class='ts-slider-end'>Min</div>", unsafe_allow_html=True)
+    max_col.markdown("<div class='ts-slider-end'>Max</div>", unsafe_allow_html=True)
+    with mid_col:
+        table_scale_pct = st.slider(
+            "Table Size", min_value=60, max_value=140, value=100, step=5,
+            format="%d%%", key="table_scale_slider",
+            help="If not all columns are visible on your screen, use your browser's zoom: Ctrl + (−) to zoom out, Ctrl + (+) to zoom in. On Mac, use ⌘ instead of Ctrl."
+        )
     with check_col:
         st.markdown("<div style='font-size:0.75rem; font-weight:600; color:#555; margin-bottom:2px; margin-top:4px;'>Compact Columns</div>", unsafe_allow_html=True)
         compact_cols = st.checkbox("Compact", value=False, key="compact_cols_toggle", label_visibility="collapsed")
