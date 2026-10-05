@@ -44,6 +44,8 @@ from thetascout.screening.scoring import (
 # The multi-stock scan always covers this window; goal filters narrow it afterwards.
 SCAN_MIN_DAYS = 1
 SCAN_MAX_DAYS = 120
+# Upper bound used when the screener is asked for "no max" days to expiry (~10 years).
+NO_MAX_DAYS = 3650
 
 app = FastAPI(
     title="ThetaScout API",
@@ -119,10 +121,13 @@ def search(
 def screener(
     ticker: Ticker,
     provider: Provider,
-    min_days: Annotated[int, Query(ge=0, le=365)] = 7,
-    max_days: Annotated[int, Query(ge=1, le=730)] = 42,
+    min_days: Annotated[int | None, Query(ge=0, le=NO_MAX_DAYS)] = None,
+    max_days: Annotated[int | None, Query(ge=0, le=NO_MAX_DAYS)] = None,
 ) -> ScreenerResponse:
-    """Every call in the expiry window with its metrics; finer filters are applied client-side."""
+    """Every call in the expiry window with its metrics; finer filters are applied client-side.
+
+    Omitting ``min_days`` or ``max_days`` means no limit on that side.
+    """
     symbol = ticker.upper()
     try:
         chain = provider.fetch_call_chain(symbol)
@@ -132,7 +137,9 @@ def screener(
         raise HTTPException(status_code=404, detail=f"No option data for '{symbol}'.")
 
     now = datetime.now()
-    df = filter_calls(symbol, chain.price, chain.calls, min_days, max_days, now=now)
+    lo = 0 if min_days is None else min_days
+    hi = NO_MAX_DAYS if max_days is None else max_days
+    df = filter_calls(symbol, chain.price, chain.calls, lo, hi, now=now)
     contracts: list[Contract] = []
     if not df.empty:
         df = add_assignment_probability(add_contract_metrics(df, chain.price, now=now), chain.price)

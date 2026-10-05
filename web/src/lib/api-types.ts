@@ -65,6 +65,8 @@ export interface paths {
         /**
          * Screener
          * @description Every call in the expiry window with its metrics; finer filters are applied client-side.
+         *
+         *     Omitting ``min_days`` or ``max_days`` means no limit on that side.
          */
         get: operations["screener_api_screener__ticker__get"];
         put?: never;
@@ -465,8 +467,8 @@ export interface operations {
     screener_api_screener__ticker__get: {
         parameters: {
             query?: {
-                min_days?: number;
-                max_days?: number;
+                min_days?: number | null;
+                max_days?: number | null;
             };
             header?: never;
             path: {

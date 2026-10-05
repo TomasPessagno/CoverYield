@@ -54,6 +54,16 @@ def test_screener_returns_contracts_with_metrics(client: TestClient) -> None:
     assert 0 < c["assignment_prob"] < 0.5
 
 
+def test_screener_without_day_limits_returns_every_expiry(client: TestClient) -> None:
+    body = client.get("/api/screener/AAA").json()
+    assert len(body["contracts"]) == 3
+
+
+def test_screener_day_window_excludes_contracts(client: TestClient) -> None:
+    assert client.get("/api/screener/AAA", params={"max_days": 20}).json()["contracts"] == []
+    assert client.get("/api/screener/AAA", params={"min_days": 40}).json()["contracts"] == []
+
+
 def test_screener_unknown_ticker_is_404(client: TestClient) -> None:
     assert client.get("/api/screener/NONE").status_code == 404
 

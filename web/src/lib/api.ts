@@ -44,10 +44,14 @@ export const api = {
   universe: () => request<UniverseTicker[]>("/universe"),
   search: (q: string, signal?: AbortSignal) =>
     request<TickerMatch[]>(`/search?q=${encodeURIComponent(q)}`, { signal }),
-  screener: (ticker: string, minDays: number, maxDays: number) =>
-    request<ScreenerResponse>(
-      `/screener/${encodeURIComponent(ticker)}?min_days=${minDays}&max_days=${maxDays}`,
-    ),
+  /** ``null`` days mean no limit on that side of the expiry window. */
+  screener: (ticker: string, minDays: number | null, maxDays: number | null) => {
+    const params = new URLSearchParams();
+    if (minDays !== null) params.set("min_days", String(minDays));
+    if (maxDays !== null) params.set("max_days", String(maxDays));
+    const qs = params.size ? `?${params}` : "";
+    return request<ScreenerResponse>(`/screener/${encodeURIComponent(ticker)}${qs}`);
+  },
   scanTicker: (ticker: string) =>
     request<ScanTickerResponse>(`/scan/${encodeURIComponent(ticker)}`, { method: "POST" }),
   opportunities: (body: OpportunitiesRequest, signal?: AbortSignal) =>

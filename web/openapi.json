@@ -98,7 +98,7 @@
     "/api/screener/{ticker}": {
       "get": {
         "summary": "Screener",
-        "description": "Every call in the expiry window with its metrics; finer filters are applied client-side.",
+        "description": "Every call in the expiry window with its metrics; finer filters are applied client-side.\n\nOmitting ``min_days`` or ``max_days`` means no limit on that side.",
         "operationId": "screener_api_screener__ticker__get",
         "parameters": [
           {
@@ -118,10 +118,16 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "maximum": 365,
-              "minimum": 0,
-              "default": 7,
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 3650,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Min Days"
             }
           },
@@ -130,10 +136,16 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "maximum": 730,
-              "minimum": 1,
-              "default": 42,
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 3650,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Max Days"
             }
           }

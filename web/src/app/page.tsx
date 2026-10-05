@@ -32,8 +32,9 @@ type Result = { key: string; data?: ScreenerResponse; error?: string };
 export default function ScreenerPage() {
   const [universe, setUniverse] = useState<UniverseTicker[]>([]);
   const [ticker, setTicker] = useState<string | null>(null);
-  const [minDays, setMinDays] = useState(7);
-  const [maxDays, setMaxDays] = useState(42);
+  // Expiry window in days; null = no limit on that side.
+  const [minDays, setMinDays] = useState<number | null>(null);
+  const [maxDays, setMaxDays] = useState<number | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [lastData, setLastData] = useState<ScreenerResponse | null>(null);
 
@@ -47,8 +48,9 @@ export default function ScreenerPage() {
     api.universe().then(setUniverse).catch(() => {});
   }, []);
 
-  const lo = Math.min(minDays, maxDays);
-  const hi = Math.max(minDays, maxDays);
+  const swap = minDays !== null && maxDays !== null && minDays > maxDays;
+  const lo = swap ? maxDays : minDays;
+  const hi = swap ? minDays : maxDays;
   const key = ticker ? `${ticker}|${lo}|${hi}` : null;
 
   useEffect(() => {
@@ -89,11 +91,11 @@ export default function ScreenerPage() {
         <Field label="Ticker">
           <TickerSearch universe={universe} onSubmit={setTicker} />
         </Field>
-        <Field label="Min days to expiry" hint="Shortest expiry to include">
-          <NumberInput value={minDays} onChange={setMinDays} min={0} max={365} suffix="d" />
+        <Field label="Min days to expiry" hint="Shortest expiry to include. Leave empty for no limit">
+          <OptionalNumberInput value={minDays} onChange={setMinDays} min={0} suffix="d" placeholder="No min" />
         </Field>
-        <Field label="Max days to expiry" hint="Longest expiry to include">
-          <NumberInput value={maxDays} onChange={setMaxDays} min={1} max={730} suffix="d" />
+        <Field label="Max days to expiry" hint="Longest expiry to include. Leave empty for no limit">
+          <OptionalNumberInput value={maxDays} onChange={setMaxDays} min={0} suffix="d" placeholder="No max" />
         </Field>
       </div>
 
@@ -107,7 +109,7 @@ export default function ScreenerPage() {
             data={data}
             loading={loading}
             summary={[
-              `${lo}–${hi}d`,
+              expiryLabel(lo, hi),
               `strike +$${minOffset} to ${maxOffset === null ? "no max" : `+$${maxOffset}`}`,
               ...(minStatic > 0 ? [`static ≥ ${fmtPct(minStatic, 1)}`] : []),
               ...(minAnnual > 0 ? [`annual ≥ ${fmtPct(minAnnual, 0)}`] : []),
@@ -264,6 +266,13 @@ function Stats({ contracts }: { contracts: Contract[] }) {
       ))}
     </dl>
   );
+}
+
+function expiryLabel(lo: number | null, hi: number | null): string {
+  if (lo === null && hi === null) return "all expiries";
+  if (lo === null) return `≤${hi}d`;
+  if (hi === null) return `≥${lo}d`;
+  return `${lo}–${hi}d`;
 }
 
 const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
