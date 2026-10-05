@@ -78,6 +78,29 @@ Then open http://localhost:3000.
 For development: `pip install -e ".[app,api,dev]"`, then `ruff check .`, `mypy` and
 `pytest`; in `web/`, `npm run lint` and `npm run typecheck`.
 
+## How data flows
+
+Yahoo Finance rate-limits aggressively, so the hosted site never calls it per visitor:
+
+- An hourly GitHub Actions job (market hours only) fetches the ticker universe and stores
+  each option chain, compressed, in Redis.
+- The site serves everyone from those snapshots and shows when the data was fetched.
+- **Scan now** refreshes a single ticker live. On the hosted site each ticker can be
+  refreshed once every 10 minutes, shared by all visitors (enforced with a Redis lock);
+  running locally there is no limit.
+
+| Setting | Local (default) | Hosted |
+|---|---|---|
+| `THETASCOUT_MODE` | `local` | `hosted` |
+| Chain storage | in memory | Redis via `REDIS_URL` |
+| Scan now cooldown | none | 10 minutes per ticker |
+
+## Deployment
+
+One Vercel project using [Services](https://vercel.com/docs/services) (`vercel.json`):
+the Next.js app serves `/` and the FastAPI app serves `/api/*`. Redis is Upstash, added
+through the Vercel Marketplace. The snapshot workflow needs a `REDIS_URL` repository secret.
+
 ## Disclaimer
 
 For educational purposes only. Not financial advice. Market data comes from Yahoo
