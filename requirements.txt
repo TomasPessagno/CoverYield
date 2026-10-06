@@ -1,5 +1,5 @@
-# Runtime dependencies for deployment (the API on Vercel): the coveryield package
-# plus FastAPI and Redis.
+# Runtime dependencies for deployment: the coveryield package with its API
+# dependencies (FastAPI, Redis) declared in pyproject.toml.
 # Local development:   pip install -e ".[app,api,dev]"
 # Streamlit fallback:  pip install -e ".[app]"
-.[api]
+.

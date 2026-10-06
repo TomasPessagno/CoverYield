@@ -14,6 +14,10 @@ authors = [{ name = "Tomas Pessagno" }]
 dependencies = [
     "pandas>=2.2",
     "yfinance>=0.2.40",
+    # The HTTP API and its shared Redis store. Base dependencies (not an extra)
+    # because Vercel installs only these when deploying the API.
+    "fastapi>=0.115",
+    "redis>=5",
 ]
 
 [project.optional-dependencies]
@@ -23,9 +27,8 @@ app = [
     "streamlit-searchbox>=0.1.20",
 ]
 api = [
-    "fastapi>=0.115",
+    # Local web server for the API (Vercel runs the app itself).
     "uvicorn[standard]>=0.30",
-    "redis>=5",
 ]
 dev = [
     "pytest>=8",
