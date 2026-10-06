@@ -4,7 +4,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from thetascout.pricing.black_scholes import call_delta, norm_cdf
+from coveryield.pricing.black_scholes import call_delta, norm_cdf
 
 
 def test_norm_cdf_known_values() -> None:

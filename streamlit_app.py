@@ -1,5 +1,5 @@
 """
-ThetaScout - Covered Call Screener (Streamlit app)
+CoverYield - Covered Call Screener (Streamlit app)
 ==================================================
 
 This app screens call options for covered call strategies by:
@@ -17,17 +17,17 @@ from datetime import datetime
 from streamlit_searchbox import st_searchbox
 import altair as alt
 
-from thetascout.data.provider import DataFetchError
-from thetascout.data.universe import DEFAULT_UNIVERSE, TICKER_MAP
-from thetascout.data.yahoo import YahooFinanceProvider
-from thetascout.screening.filters import (
+from coveryield.data.provider import DataFetchError
+from coveryield.data.universe import DEFAULT_UNIVERSE, TICKER_MAP
+from coveryield.data.yahoo import YahooFinanceProvider
+from coveryield.screening.filters import (
     add_contract_metrics,
     filter_by_goals,
     filter_by_strike_and_return,
     filter_calls,
 )
-from thetascout.screening.scan import scan_one_ticker, scan_universe
-from thetascout.screening.scoring import (
+from coveryield.screening.scan import scan_one_ticker, scan_universe
+from coveryield.screening.scoring import (
     compute_opportunity_score,
     normalize_weights,
     rank_opportunities,
@@ -41,7 +41,7 @@ PROVIDER = YahooFinanceProvider()
 # =============================================================================
 
 st.set_page_config(
-    page_title="ThetaScout",
+    page_title="CoverYield",
     layout="wide"
 )
 
@@ -885,7 +885,7 @@ def custom_analysis_tab():
 
 def main():
     """App entry point — renders the title and the two tabs."""
-    st.title("ThetaScout")
+    st.title("CoverYield")
     tab_screener, tab_custom = st.tabs(["Screener", "Custom Analysis"])
     with tab_screener:
         screener_tab()

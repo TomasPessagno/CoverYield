@@ -3,10 +3,10 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
+from coveryield.data.provider import CallChain
+from coveryield.pricing.black_scholes import call_delta
+from coveryield.screening.scan import scan_one_ticker, scan_universe
 from tests.conftest import FakeProvider, make_calls
-from thetascout.data.provider import CallChain
-from thetascout.pricing.black_scholes import call_delta
-from thetascout.screening.scan import scan_one_ticker, scan_universe
 
 
 def chain(ticker: str, price: float = 100.0) -> CallChain:

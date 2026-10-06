@@ -14,8 +14,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from thetascout.data.provider import CallChain, DataFetchError, MarketDataProvider
-from thetascout.data.store import ChainStore, StoredChain
+from coveryield.data.provider import CallChain, DataFetchError, MarketDataProvider
+from coveryield.data.store import ChainStore, StoredChain
 
 LOCK_TTL_SECONDS = 60
 LOCK_WAIT_SECONDS = 30.0

@@ -1,9 +1,9 @@
 """Runtime configuration, read from environment variables.
 
-THETASCOUT_MODE                "local" (default) or "hosted"
+COVERYIELD_MODE                "local" (default) or "hosted"
 REDIS_URL / KV_URL             if set, chains are stored in Redis (shared across
                                instances); otherwise in memory
-THETASCOUT_REFRESH_COOLDOWN    seconds between live refreshes of the same ticker
+COVERYIELD_REFRESH_COOLDOWN    seconds between live refreshes of the same ticker
                                (default: 0 locally, 600 when hosted)
 
 Locally there is no cooldown: it's your own connection, so "Scan now" always
@@ -34,9 +34,9 @@ class Settings:
 
 
 def load_settings() -> Settings:
-    mode: Mode = "hosted" if os.environ.get("THETASCOUT_MODE", "").lower() == "hosted" else "local"
+    mode: Mode = "hosted" if os.environ.get("COVERYIELD_MODE", "").lower() == "hosted" else "local"
     redis_url = os.environ.get("REDIS_URL") or os.environ.get("KV_URL") or None
     default_cooldown = HOSTED_COOLDOWN_SECONDS if mode == "hosted" else 0.0
-    cooldown = float(os.environ.get("THETASCOUT_REFRESH_COOLDOWN", default_cooldown))
+    cooldown = float(os.environ.get("COVERYIELD_REFRESH_COOLDOWN", default_cooldown))
     max_age = None if mode == "hosted" else LOCAL_MAX_AGE_SECONDS
     return Settings(mode, redis_url, cooldown, max_age)

@@ -22,11 +22,11 @@ from datetime import time as dtime
 from zoneinfo import ZoneInfo
 
 from api.settings import load_settings
-from thetascout.data.provider import DataFetchError, MarketDataProvider
-from thetascout.data.service import ChainService
-from thetascout.data.store import ChainStore, MemoryStore, RedisStore
-from thetascout.data.universe import DEFAULT_UNIVERSE
-from thetascout.data.yahoo import YahooFinanceProvider
+from coveryield.data.provider import DataFetchError, MarketDataProvider
+from coveryield.data.service import ChainService
+from coveryield.data.store import ChainStore, MemoryStore, RedisStore
+from coveryield.data.universe import DEFAULT_UNIVERSE
+from coveryield.data.yahoo import YahooFinanceProvider
 
 NEW_YORK = ZoneInfo("America/New_York")
 # From shortly after the open (skip the noisy first half hour) to just after the close.

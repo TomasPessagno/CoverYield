@@ -9,7 +9,7 @@ import "./globals.css";
 const geist = Geist({ variable: "--font-geist", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ThetaScout",
+  title: "CoverYield",
   description:
     "Covered call screener: live option chains, Black-Scholes assignment probability and multi-stock opportunity ranking.",
 };

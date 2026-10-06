@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from thetascout.pricing.black_scholes import call_delta
+from coveryield.pricing.black_scholes import call_delta
 
 # Strikes below this fraction of the stock price are deep in the money and dropped.
 MIN_STRIKE_FRACTION = 0.90

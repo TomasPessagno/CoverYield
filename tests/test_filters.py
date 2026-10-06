@@ -3,13 +3,13 @@ from datetime import datetime
 import pandas as pd
 import pytest
 
-from tests.conftest import make_calls
-from thetascout.screening.filters import (
+from coveryield.screening.filters import (
     add_contract_metrics,
     filter_by_goals,
     filter_by_strike_and_return,
     filter_calls,
 )
+from tests.conftest import make_calls
 
 
 def test_filter_calls_keeps_expiry_window(now: datetime) -> None:

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import pytest
 
-from thetascout.data.provider import CallChain, DataFetchError
+from coveryield.data.provider import CallChain, DataFetchError
 
 NOW = datetime(2026, 1, 5, 12, 0, 0)
 

@@ -4,9 +4,9 @@ import pandas as pd
 import pytest
 
 from api.snapshot import in_snapshot_window, run_snapshot
+from coveryield.data.provider import CallChain
+from coveryield.data.store import MemoryStore
 from tests.conftest import FakeProvider
-from thetascout.data.provider import CallChain
-from thetascout.data.store import MemoryStore
 
 
 @pytest.mark.parametrize(

@@ -7,7 +7,7 @@ import time
 import pandas as pd
 import yfinance as yf
 
-from thetascout.data.provider import CallChain, DataFetchError
+from coveryield.data.provider import CallChain, DataFetchError
 
 
 class YahooFinanceProvider:

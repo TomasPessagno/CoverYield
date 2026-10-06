@@ -3,9 +3,9 @@ from datetime import UTC, datetime, timedelta
 import pandas as pd
 import pytest
 
-from thetascout.data.provider import CallChain, DataFetchError
-from thetascout.data.service import ChainService
-from thetascout.data.store import MemoryStore, StoredChain
+from coveryield.data.provider import CallChain, DataFetchError
+from coveryield.data.service import ChainService
+from coveryield.data.store import MemoryStore, StoredChain
 
 T0 = datetime(2026, 1, 5, 15, 0, tzinfo=UTC)
 

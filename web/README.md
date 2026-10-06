@@ -1,6 +1,6 @@
-# ThetaScout web
+# CoverYield web
 
-The ThetaScout frontend: Next.js (App Router), TypeScript and Tailwind CSS.
+The CoverYield frontend: Next.js (App Router), TypeScript and Tailwind CSS.
 It talks to the FastAPI backend in [`../api`](../api) through `/api/*`, which
 `next.config.ts` proxies to `API_URL` (default `http://127.0.0.1:8000`).
 

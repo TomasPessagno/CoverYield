@@ -1,4 +1,4 @@
-"""Request and response models for the ThetaScout API.
+"""Request and response models for the CoverYield API.
 
 These define the JSON contract (and the generated OpenAPI schema the web
 frontend's TypeScript types are built from).

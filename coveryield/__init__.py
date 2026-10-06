@@ -1,4 +1,4 @@
-"""ThetaScout: covered call screening, pricing and scoring.
+"""CoverYield: covered call screening, pricing and scoring.
 
 The package holds all data access and math. It has no UI code, so the same
 functions back the Streamlit app today and an API later.

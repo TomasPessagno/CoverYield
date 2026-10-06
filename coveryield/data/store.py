@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import pandas as pd
 
-from thetascout.data.provider import CallChain
+from coveryield.data.provider import CallChain
 
 if TYPE_CHECKING:
     from redis import Redis
@@ -117,7 +117,7 @@ class MemoryStore:
 class RedisStore:
     """Chains held in Redis, shared by every server instance."""
 
-    def __init__(self, client: Redis, prefix: str = "thetascout", ttl_days: int = 7) -> None:
+    def __init__(self, client: Redis, prefix: str = "coveryield", ttl_days: int = 7) -> None:
         self._redis = client
         self._prefix = prefix
         # Records expire eventually so tickers nobody looks at don't linger forever.

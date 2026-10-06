@@ -1,4 +1,4 @@
-# Runtime dependencies for deployment (the API on Vercel): the thetascout package
+# Runtime dependencies for deployment (the API on Vercel): the coveryield package
 # plus FastAPI and Redis.
 # Local development:   pip install -e ".[app,api,dev]"
 # Streamlit fallback:  pip install -e ".[app]"

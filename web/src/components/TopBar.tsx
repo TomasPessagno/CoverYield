@@ -27,7 +27,7 @@ export function TopBar() {
     <header className="sticky top-0 z-30 border-b border-border bg-bg/90 backdrop-blur">
       <div className="mx-auto flex h-12 w-full max-w-[1440px] items-center gap-8 px-4 sm:px-6">
         <Link href="/" className="text-[15px] font-semibold tracking-tight">
-          ThetaScout
+          CoverYield
         </Link>
         <nav className="flex h-full items-stretch gap-6">
           {NAV.map(({ href, label }) => {

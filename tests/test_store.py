@@ -4,9 +4,8 @@ from datetime import UTC, datetime
 import pandas as pd
 import pytest
 
-from tests.conftest import make_calls
-from thetascout.data.provider import CallChain
-from thetascout.data.store import (
+from coveryield.data.provider import CallChain
+from coveryield.data.store import (
     ChainStore,
     MemoryStore,
     RedisStore,
@@ -14,6 +13,7 @@ from thetascout.data.store import (
     decode,
     encode,
 )
+from tests.conftest import make_calls
 
 FETCHED = datetime(2026, 1, 5, 15, 0, tzinfo=UTC)
 

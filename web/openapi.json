@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "ThetaScout API",
+    "title": "CoverYield API",
     "description": "Covered call screening, Black-Scholes assignment probability and scoring.",
     "version": "0.2.0"
   },

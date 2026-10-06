@@ -1,7 +1,9 @@
-# ThetaScout
+# CoverYield
 
-[![CI](https://github.com/TomasPessagno/ThetaScout/actions/workflows/ci.yml/badge.svg)](https://github.com/TomasPessagno/ThetaScout/actions/workflows/ci.yml)
+[![CI](https://github.com/TomasPessagno/CoverYield/actions/workflows/ci.yml/badge.svg)](https://github.com/TomasPessagno/CoverYield/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+*Formerly ThetaScout. Renamed to avoid confusion with an unrelated commercial product.*
 
 A covered call screener. It pulls live option chains, computes the metrics a call
 seller cares about, and ranks opportunities across many stocks with a transparent
@@ -43,10 +45,10 @@ dividend (5%, currently neutral).
 - **Quality:** pytest + Hypothesis (property-based tests), ruff, mypy --strict,
   ESLint, GitHub Actions CI
 
-All data access and math live in the `thetascout` package, which has no UI code.
+All data access and math live in the `coveryield` package, which has no UI code.
 
 ```
-thetascout/
+coveryield/
   data/        market-data provider interface, Yahoo Finance implementation, cache, universe
   pricing/     Black-Scholes
   screening/   chain filters, per-contract metrics, multi-stock scan, scoring
@@ -59,8 +61,8 @@ streamlit_app.py   the original Streamlit UI, kept while the new frontend is rol
 ## Run it locally
 
 ```bash
-git clone https://github.com/TomasPessagno/ThetaScout.git
-cd ThetaScout
+git clone https://github.com/TomasPessagno/CoverYield.git
+cd CoverYield
 pip install -e ".[api]"
 uvicorn api.app:app --port 8000
 ```
@@ -91,7 +93,7 @@ Yahoo Finance rate-limits aggressively, so the hosted site never calls it per vi
 
 | Setting | Local (default) | Hosted |
 |---|---|---|
-| `THETASCOUT_MODE` | `local` | `hosted` |
+| `COVERYIELD_MODE` | `local` | `hosted` |
 | Chain storage | in memory | Redis via `REDIS_URL` |
 | Scan now cooldown | none | 10 minutes per ticker |
 

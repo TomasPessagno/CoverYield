@@ -44,5 +44,5 @@ jobs:
       - name: Snapshot
         if: env.REDIS_URL != ''
         env:
-          THETASCOUT_MODE: hosted
+          COVERYIELD_MODE: hosted
         run: python -m api.snapshot ${{ inputs.force && '--force' || '' }}

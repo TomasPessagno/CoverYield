@@ -3,7 +3,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from thetascout.screening.scoring import (
+from coveryield.screening.scoring import (
     DEFAULT_WEIGHTS,
     compute_opportunity_score,
     normalize_weights,

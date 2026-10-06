@@ -1,4 +1,4 @@
-"""ThetaScout HTTP API: a thin FastAPI layer over the thetascout package.
+"""CoverYield HTTP API: a thin FastAPI layer over the coveryield package.
 
 Run locally from the repo root:  uvicorn api.app:app --reload
 
@@ -30,20 +30,20 @@ from api.schemas import (
     UniverseTicker,
 )
 from api.settings import Settings, load_settings
-from thetascout import __version__
-from thetascout.data.provider import DataFetchError, MarketDataProvider
-from thetascout.data.service import ChainResult, ChainService
-from thetascout.data.store import ChainStore, MemoryStore, RedisStore
-from thetascout.data.universe import TICKER_MAP
-from thetascout.data.yahoo import YahooFinanceProvider
-from thetascout.screening.filters import (
+from coveryield import __version__
+from coveryield.data.provider import DataFetchError, MarketDataProvider
+from coveryield.data.service import ChainResult, ChainService
+from coveryield.data.store import ChainStore, MemoryStore, RedisStore
+from coveryield.data.universe import TICKER_MAP
+from coveryield.data.yahoo import YahooFinanceProvider
+from coveryield.screening.filters import (
     add_assignment_probability,
     add_contract_metrics,
     filter_by_goals,
     filter_calls,
 )
-from thetascout.screening.scan import enrich_chain
-from thetascout.screening.scoring import (
+from coveryield.screening.scan import enrich_chain
+from coveryield.screening.scoring import (
     compute_opportunity_score,
     normalize_weights,
     rank_opportunities,
@@ -56,7 +56,7 @@ SCAN_MAX_DAYS = 120
 NO_MAX_DAYS = 3650
 
 app = FastAPI(
-    title="ThetaScout API",
+    title="CoverYield API",
     version=__version__,
     description="Covered call screening, Black-Scholes assignment probability and scoring.",
 )

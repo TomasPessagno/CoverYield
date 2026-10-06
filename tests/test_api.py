@@ -8,10 +8,10 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from api.app import app, get_provider, get_service, get_settings  # noqa: E402
 from api.settings import Settings  # noqa: E402
+from coveryield.data.provider import CallChain  # noqa: E402
+from coveryield.data.service import ChainService  # noqa: E402
+from coveryield.data.store import MemoryStore  # noqa: E402
 from tests.conftest import FakeProvider, make_calls  # noqa: E402
-from thetascout.data.provider import CallChain  # noqa: E402
-from thetascout.data.service import ChainService  # noqa: E402
-from thetascout.data.store import MemoryStore  # noqa: E402
 
 
 def chain(ticker: str, price: float = 100.0) -> CallChain:

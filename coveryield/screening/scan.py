@@ -7,9 +7,9 @@ from datetime import datetime
 
 import pandas as pd
 
-from thetascout.data.provider import CallChain, DataFetchError, MarketDataProvider
-from thetascout.data.yahoo import YahooFinanceProvider
-from thetascout.screening.filters import (
+from coveryield.data.provider import CallChain, DataFetchError, MarketDataProvider
+from coveryield.data.yahoo import YahooFinanceProvider
+from coveryield.screening.filters import (
     add_assignment_probability,
     add_contract_metrics,
     filter_calls,
