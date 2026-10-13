@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterator
-from datetime import datetime
 from functools import lru_cache
 from typing import Annotated, Any
 
@@ -36,9 +35,11 @@ from coveryield.data.service import ChainResult, ChainService
 from coveryield.data.store import ChainStore, MemoryStore, RedisStore
 from coveryield.data.universe import TICKER_MAP
 from coveryield.data.yahoo import YahooFinanceProvider
+from coveryield.market_time import market_now
+from coveryield.pricing.black_scholes import DEFAULT_RISK_FREE_RATE
 from coveryield.screening.filters import (
-    add_assignment_probability,
     add_contract_metrics,
+    add_greeks,
     filter_by_goals,
     filter_calls,
 )
@@ -106,13 +107,17 @@ def _num(value: Any, default: float = 0.0) -> float:
     return default if math.isnan(f) else f
 
 
+def _optional(value: Any) -> float | None:
+    return None if value is None or pd.isna(value) else float(value)
+
+
 def _contract_fields(row: dict[str, Any]) -> dict[str, Any]:
-    delta = row.get("Assignment Prob")
     return {
         "contract_symbol": str(row["contractSymbol"]),
         "ticker": str(row["Ticker"]),
         "expiration": pd.Timestamp(row["expirationDate"]).date(),
         "days_to_expiry": int(row["Days to Expiry"]),
+        "years_to_expiry": _num(row["Years to Expiry"]),
         "strike": _num(row["Strike"]),
         "bid": _num(row["BidPrice"]),
         "ask": _num(row["AskPrice"]),
@@ -125,7 +130,15 @@ def _contract_fields(row: dict[str, Any]) -> dict[str, Any]:
         "volume": int(_num(row["Volume"])),
         "open_interest": int(_num(row["Open Interest"])),
         "iv_pct": _num(row["IV"]),
-        "assignment_prob": None if delta is None or pd.isna(delta) else float(delta),
+        "assignment_prob": _optional(row.get("Assignment Prob")),
+        "delta": _optional(row.get("Delta")),
+        "gamma": _optional(row.get("Gamma")),
+        "theta_per_day": _optional(row.get("Theta/Day")),
+        "vega": _optional(row.get("Vega")),
+        "rho": _optional(row.get("Rho")),
+        "model_price": _optional(row.get("Model Price")),
+        "d1": _optional(row.get("d1")),
+        "d2": _optional(row.get("d2")),
     }
 
 
@@ -141,13 +154,13 @@ def _screener_response(
     if chain.is_empty:
         raise HTTPException(status_code=404, detail=f"No option data for '{symbol}'.")
 
-    now = datetime.now()
+    now = market_now()
     lo = 0 if min_days is None else min_days
     hi = NO_MAX_DAYS if max_days is None else max_days
     df = filter_calls(symbol, chain.price, chain.calls, lo, hi, now=now)
     contracts: list[Contract] = []
     if not df.empty:
-        df = add_assignment_probability(add_contract_metrics(df, chain.price, now=now), chain.price)
+        df = add_greeks(add_contract_metrics(df, chain.price, now=now), chain.price)
         contracts = [Contract(**_contract_fields(r)) for r in _records(df)]
     return ScreenerResponse(
         ticker=symbol,
@@ -157,6 +170,7 @@ def _screener_response(
         refreshed=result.refreshed,
         stale=result.stale,
         next_refresh_at=result.next_refresh_at,
+        risk_free_rate=DEFAULT_RISK_FREE_RATE,
         contracts=contracts,
     )
 
@@ -236,7 +250,7 @@ def scan_ticker(ticker: Ticker, service: Service) -> ScanTickerResponse:
 @app.post("/api/opportunities")
 def opportunities(req: OpportunitiesRequest, service: Service) -> OpportunitiesResponse:
     """Filter the scanned tickers by the user's goals, score every contract and rank them."""
-    now = datetime.now()
+    now = market_now()
     frames = []
     fetched_times = []
     for t in dict.fromkeys(s.upper() for s in req.tickers):
@@ -250,7 +264,11 @@ def opportunities(req: OpportunitiesRequest, service: Service) -> OpportunitiesR
             fetched_times.append(result.fetched_at)
     if not frames:
         return OpportunitiesResponse(
-            scanned=len(req.tickers), matched=0, oldest_data_at=None, results=[]
+            risk_free_rate=DEFAULT_RISK_FREE_RATE,
+            scanned=len(req.tickers),
+            matched=0,
+            oldest_data_at=None,
+            results=[],
         )
 
     scanned = pd.concat(frames, ignore_index=True)
@@ -276,6 +294,7 @@ def opportunities(req: OpportunitiesRequest, service: Service) -> OpportunitiesR
         for r in _records(ranked)
     ]
     return OpportunitiesResponse(
+        risk_free_rate=DEFAULT_RISK_FREE_RATE,
         scanned=len(req.tickers),
         matched=len(matched),
         oldest_data_at=min(fetched_times),

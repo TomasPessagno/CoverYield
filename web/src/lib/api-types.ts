@@ -197,8 +197,16 @@ export interface components {
              * Format: date
              */
             expiration: string;
-            /** Days To Expiry */
+            /**
+             * Days To Expiry
+             * @description Calendar days until expiry (0 = expires today)
+             */
             days_to_expiry: number;
+            /**
+             * Years To Expiry
+             * @description Time until the 4pm New York close on the expiry date, in years (T)
+             */
+            years_to_expiry: number;
             /** Strike */
             strike: number;
             /** Bid */
@@ -240,9 +248,43 @@ export interface components {
             iv_pct: number;
             /**
              * Assignment Prob
-             * @description Black-Scholes call delta: approx. probability of finishing in the money
+             * @description N(d2): Black-Scholes probability the stock finishes above the strike
              */
             assignment_prob: number | null;
+            /**
+             * Delta
+             * @description Call price change per $1 stock move, per share
+             */
+            delta: number | null;
+            /**
+             * Gamma
+             * @description Delta change per $1 stock move
+             */
+            gamma: number | null;
+            /**
+             * Theta Per Day
+             * @description Call price change per calendar day, per share (negative)
+             */
+            theta_per_day: number | null;
+            /**
+             * Vega
+             * @description Call price change per 1 percentage point of volatility, per share
+             */
+            vega: number | null;
+            /**
+             * Rho
+             * @description Call price change per 1 percentage point of interest rate, per share
+             */
+            rho: number | null;
+            /**
+             * Model Price
+             * @description Black-Scholes price at this contract's IV
+             */
+            model_price: number | null;
+            /** D1 */
+            d1: number | null;
+            /** D2 */
+            d2: number | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -282,6 +324,11 @@ export interface components {
         };
         /** OpportunitiesResponse */
         OpportunitiesResponse: {
+            /**
+             * Risk Free Rate
+             * @description Annual rate used in the Black-Scholes formulas
+             */
+            risk_free_rate: number;
             /** Scanned */
             scanned: number;
             /** Matched */
@@ -305,8 +352,16 @@ export interface components {
              * Format: date
              */
             expiration: string;
-            /** Days To Expiry */
+            /**
+             * Days To Expiry
+             * @description Calendar days until expiry (0 = expires today)
+             */
             days_to_expiry: number;
+            /**
+             * Years To Expiry
+             * @description Time until the 4pm New York close on the expiry date, in years (T)
+             */
+            years_to_expiry: number;
             /** Strike */
             strike: number;
             /** Bid */
@@ -348,9 +403,43 @@ export interface components {
             iv_pct: number;
             /**
              * Assignment Prob
-             * @description Black-Scholes call delta: approx. probability of finishing in the money
+             * @description N(d2): Black-Scholes probability the stock finishes above the strike
              */
             assignment_prob: number | null;
+            /**
+             * Delta
+             * @description Call price change per $1 stock move, per share
+             */
+            delta: number | null;
+            /**
+             * Gamma
+             * @description Delta change per $1 stock move
+             */
+            gamma: number | null;
+            /**
+             * Theta Per Day
+             * @description Call price change per calendar day, per share (negative)
+             */
+            theta_per_day: number | null;
+            /**
+             * Vega
+             * @description Call price change per 1 percentage point of volatility, per share
+             */
+            vega: number | null;
+            /**
+             * Rho
+             * @description Call price change per 1 percentage point of interest rate, per share
+             */
+            rho: number | null;
+            /**
+             * Model Price
+             * @description Black-Scholes price at this contract's IV
+             */
+            model_price: number | null;
+            /** D1 */
+            d1: number | null;
+            /** D2 */
+            d2: number | null;
             /** Price */
             price: number;
             /** Score */
@@ -404,6 +493,11 @@ export interface components {
              * @description When a live refresh is allowed again (null = now)
              */
             next_refresh_at: string | null;
+            /**
+             * Risk Free Rate
+             * @description Annual rate used in the Black-Scholes formulas
+             */
+            risk_free_rate: number;
             /** Contracts */
             contracts: components["schemas"]["Contract"][];
         };

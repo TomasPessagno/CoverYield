@@ -38,9 +38,9 @@ def compute_opportunity_score(df: pd.DataFrame, weights: Mapping[str, float]) ->
     actual_frac = weights.get("yield_actual_frac", DEFAULT_YIELD_ACTUAL_FRAC)
     out["s_yield"] = actual_frac * actual_norm + (1 - actual_frac) * annual_norm
 
-    # 30% Assignment risk — lower delta (prob. of being called away) = better
-    delta = out["Assignment Prob"].fillna(0.5)
-    out["s_assign"] = (1 - delta).clip(0, 1) * 100
+    # 30% Assignment risk — lower N(d2) (prob. of being called away) = better
+    p_assign = out["Assignment Prob"].astype(float).fillna(0.5)
+    out["s_assign"] = (1 - p_assign).clip(0, 1) * 100
 
     # 15% Liquidity — open interest + volume, penalize wide spreads
     oi = (out["Open Interest"] / 500.0).clip(0, 1)

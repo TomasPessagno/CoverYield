@@ -400,7 +400,13 @@
           },
           "days_to_expiry": {
             "type": "integer",
-            "title": "Days To Expiry"
+            "title": "Days To Expiry",
+            "description": "Calendar days until expiry (0 = expires today)"
+          },
+          "years_to_expiry": {
+            "type": "number",
+            "title": "Years To Expiry",
+            "description": "Time until the 4pm New York close on the expiry date, in years (T)"
           },
           "strike": {
             "type": "number",
@@ -465,7 +471,101 @@
               }
             ],
             "title": "Assignment Prob",
-            "description": "Black-Scholes call delta: approx. probability of finishing in the money"
+            "description": "N(d2): Black-Scholes probability the stock finishes above the strike"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta",
+            "description": "Call price change per $1 stock move, per share"
+          },
+          "gamma": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gamma",
+            "description": "Delta change per $1 stock move"
+          },
+          "theta_per_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theta Per Day",
+            "description": "Call price change per calendar day, per share (negative)"
+          },
+          "vega": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vega",
+            "description": "Call price change per 1 percentage point of volatility, per share"
+          },
+          "rho": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rho",
+            "description": "Call price change per 1 percentage point of interest rate, per share"
+          },
+          "model_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Price",
+            "description": "Black-Scholes price at this contract's IV"
+          },
+          "d1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "D1"
+          },
+          "d2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "D2"
           }
         },
         "type": "object",
@@ -474,6 +574,7 @@
           "ticker",
           "expiration",
           "days_to_expiry",
+          "years_to_expiry",
           "strike",
           "bid",
           "ask",
@@ -486,7 +587,15 @@
           "volume",
           "open_interest",
           "iv_pct",
-          "assignment_prob"
+          "assignment_prob",
+          "delta",
+          "gamma",
+          "theta_per_day",
+          "vega",
+          "rho",
+          "model_price",
+          "d1",
+          "d2"
         ],
         "title": "Contract",
         "description": "One call option with the metrics a covered-call seller cares about."
@@ -559,6 +668,11 @@
       },
       "OpportunitiesResponse": {
         "properties": {
+          "risk_free_rate": {
+            "type": "number",
+            "title": "Risk Free Rate",
+            "description": "Annual rate used in the Black-Scholes formulas"
+          },
           "scanned": {
             "type": "integer",
             "title": "Scanned"
@@ -590,6 +704,7 @@
         },
         "type": "object",
         "required": [
+          "risk_free_rate",
           "scanned",
           "matched",
           "oldest_data_at",
@@ -614,7 +729,13 @@
           },
           "days_to_expiry": {
             "type": "integer",
-            "title": "Days To Expiry"
+            "title": "Days To Expiry",
+            "description": "Calendar days until expiry (0 = expires today)"
+          },
+          "years_to_expiry": {
+            "type": "number",
+            "title": "Years To Expiry",
+            "description": "Time until the 4pm New York close on the expiry date, in years (T)"
           },
           "strike": {
             "type": "number",
@@ -679,7 +800,101 @@
               }
             ],
             "title": "Assignment Prob",
-            "description": "Black-Scholes call delta: approx. probability of finishing in the money"
+            "description": "N(d2): Black-Scholes probability the stock finishes above the strike"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delta",
+            "description": "Call price change per $1 stock move, per share"
+          },
+          "gamma": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gamma",
+            "description": "Delta change per $1 stock move"
+          },
+          "theta_per_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Theta Per Day",
+            "description": "Call price change per calendar day, per share (negative)"
+          },
+          "vega": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vega",
+            "description": "Call price change per 1 percentage point of volatility, per share"
+          },
+          "rho": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rho",
+            "description": "Call price change per 1 percentage point of interest rate, per share"
+          },
+          "model_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Price",
+            "description": "Black-Scholes price at this contract's IV"
+          },
+          "d1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "D1"
+          },
+          "d2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "D2"
           },
           "price": {
             "type": "number",
@@ -716,6 +931,7 @@
           "ticker",
           "expiration",
           "days_to_expiry",
+          "years_to_expiry",
           "strike",
           "bid",
           "ask",
@@ -729,6 +945,14 @@
           "open_interest",
           "iv_pct",
           "assignment_prob",
+          "delta",
+          "gamma",
+          "theta_per_day",
+          "vega",
+          "rho",
+          "model_price",
+          "d1",
+          "d2",
           "price",
           "score",
           "score_yield",
@@ -805,6 +1029,11 @@
             "title": "Next Refresh At",
             "description": "When a live refresh is allowed again (null = now)"
           },
+          "risk_free_rate": {
+            "type": "number",
+            "title": "Risk Free Rate",
+            "description": "Annual rate used in the Black-Scholes formulas"
+          },
           "contracts": {
             "items": {
               "$ref": "#/components/schemas/Contract"
@@ -822,6 +1051,7 @@
           "refreshed",
           "stale",
           "next_refresh_at",
+          "risk_free_rate",
           "contracts"
         ],
         "title": "ScreenerResponse"

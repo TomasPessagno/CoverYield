@@ -27,7 +27,10 @@ class Contract(BaseModel):
     contract_symbol: str
     ticker: str
     expiration: date
-    days_to_expiry: int
+    days_to_expiry: int = Field(description="Calendar days until expiry (0 = expires today)")
+    years_to_expiry: float = Field(
+        description="Time until the 4pm New York close on the expiry date, in years (T)"
+    )
     strike: float
     bid: float
     ask: float
@@ -41,8 +44,22 @@ class Contract(BaseModel):
     open_interest: int
     iv_pct: float = Field(description="implied volatility, in percent")
     assignment_prob: float | None = Field(
-        description="Black-Scholes call delta: approx. probability of finishing in the money"
+        description="N(d2): Black-Scholes probability the stock finishes above the strike"
     )
+    delta: float | None = Field(description="Call price change per $1 stock move, per share")
+    gamma: float | None = Field(description="Delta change per $1 stock move")
+    theta_per_day: float | None = Field(
+        description="Call price change per calendar day, per share (negative)"
+    )
+    vega: float | None = Field(
+        description="Call price change per 1 percentage point of volatility, per share"
+    )
+    rho: float | None = Field(
+        description="Call price change per 1 percentage point of interest rate, per share"
+    )
+    model_price: float | None = Field(description="Black-Scholes price at this contract's IV")
+    d1: float | None
+    d2: float | None
 
 
 class AppConfig(BaseModel):
@@ -63,6 +80,7 @@ class ScreenerResponse(BaseModel):
     next_refresh_at: datetime | None = Field(
         description="When a live refresh is allowed again (null = now)"
     )
+    risk_free_rate: float = Field(description="Annual rate used in the Black-Scholes formulas")
     contracts: list[Contract]
 
 
@@ -105,6 +123,7 @@ class Opportunity(Contract):
 
 
 class OpportunitiesResponse(BaseModel):
+    risk_free_rate: float = Field(description="Annual rate used in the Black-Scholes formulas")
     scanned: int
     matched: int
     oldest_data_at: datetime | None = Field(

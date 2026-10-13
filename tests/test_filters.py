@@ -53,10 +53,11 @@ def test_filter_calls_empty_input() -> None:
 
 def test_add_contract_metrics_worked_example(now: datetime) -> None:
     # The textbook example: $100 stock, $105 strike, $2 premium, 30 days.
-    calls = make_calls([{"strike": 105, "days": 30.5, "bid": 2.0, "iv": 0.25}])
+    calls = make_calls([{"strike": 105, "days": 30, "bid": 2.0, "iv": 0.25}])
     df = filter_calls("TEST", 100.0, calls, 7, 42, now=now)
     row = add_contract_metrics(df, 100.0, now=now).iloc[0]
     assert row["Days to Expiry"] == 30
+    assert row["Years to Expiry"] == pytest.approx((30 + 4 / 24) / 365)  # to the 4pm close
     assert row["Annualized Return %"] == pytest.approx(2.0 * 365 / 30)
     assert row["Distance to Strike %"] == pytest.approx(5.0)
     assert row["Breakeven Price"] == pytest.approx(98.0)
@@ -64,7 +65,7 @@ def test_add_contract_metrics_worked_example(now: datetime) -> None:
 
 
 def test_annualized_return_is_zero_at_expiry(now: datetime) -> None:
-    calls = make_calls([{"strike": 105, "days": 0.5, "bid": 1.0}])
+    calls = make_calls([{"strike": 105, "days": 0, "bid": 1.0}])
     df = filter_calls("TEST", 100.0, calls, 0, 42, now=now)
     row = add_contract_metrics(df, 100.0, now=now).iloc[0]
     assert row["Days to Expiry"] == 0
@@ -97,3 +98,11 @@ def test_filter_by_goals(now: datetime) -> None:
     df = add_contract_metrics(filter_calls("TEST", 100.0, calls, 1, 120, now=now), 100.0, now=now)
     out = filter_by_goals(df, min_static_return=1.0, max_days_to_expiry=45, min_otm_pct=2.0)
     assert list(out["contractSymbol"]) == ["TEST0000"]
+
+
+def test_days_to_expiry_counts_calendar_days(now: datetime) -> None:
+    # At noon, a contract expiring tomorrow is 1 day out and has ~1.17 days to the close.
+    calls = make_calls([{"strike": 105, "days": 1}, {"strike": 105, "days": 3}])
+    row = add_contract_metrics(filter_calls("TEST", 100.0, calls, 0, 42, now=now), 100.0, now=now)
+    assert list(row["Days to Expiry"]) == [1, 3]
+    assert row["Years to Expiry"].iloc[0] == pytest.approx((1 + 4 / 24) / 365)

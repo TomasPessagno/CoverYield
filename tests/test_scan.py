@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from coveryield.data.provider import CallChain
-from coveryield.pricing.black_scholes import call_delta
+from coveryield.pricing.black_scholes import call_greeks
 from coveryield.screening.scan import scan_one_ticker, scan_universe
 from tests.conftest import FakeProvider, make_calls
 
@@ -12,9 +12,9 @@ from tests.conftest import FakeProvider, make_calls
 def chain(ticker: str, price: float = 100.0) -> CallChain:
     calls = make_calls(
         [
-            {"strike": 105, "days": 30.5, "bid": 2.0, "iv": 0.30},
-            {"strike": 110, "days": 30.5, "bid": 0.0},  # zero bid -> dropped
-            {"strike": 105, "days": 0.5, "bid": 1.0},  # expires today -> dropped
+            {"strike": 105, "days": 30, "bid": 2.0, "iv": 0.30},
+            {"strike": 110, "days": 30, "bid": 0.0},  # zero bid -> dropped
+            {"strike": 105, "days": 0, "bid": 1.0},  # expires today -> dropped
         ]
     )
     return CallChain(ticker, price, price, calls)
@@ -27,7 +27,14 @@ def test_scan_one_ticker_enriches_and_gates(now: datetime) -> None:
     row = out.iloc[0]
     assert row["Current Price"] == 100.0
     assert row["Days to Expiry"] == 30
-    assert row["Assignment Prob"] == pytest.approx(call_delta(100.0, 105, 30 / 365, 0.30))
+    # Noon to the 4pm close 30 days later: 30 days and 4 hours.
+    assert row["Years to Expiry"] == pytest.approx((30 + 4 / 24) / 365)
+    greeks = call_greeks(100.0, 105, (30 + 4 / 24) / 365, 0.30)
+    assert greeks is not None
+    assert row["Assignment Prob"] == pytest.approx(greeks.prob_itm)
+    assert row["Delta"] == pytest.approx(greeks.delta)
+    assert row["Theta/Day"] == pytest.approx(greeks.theta / 365)
+    assert row["Vega"] == pytest.approx(greeks.vega / 100)
 
 
 def test_scan_one_ticker_returns_empty_on_failure_or_no_data(now: datetime) -> None:

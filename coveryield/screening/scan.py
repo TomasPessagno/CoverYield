@@ -10,8 +10,8 @@ import pandas as pd
 from coveryield.data.provider import CallChain, DataFetchError, MarketDataProvider
 from coveryield.data.yahoo import YahooFinanceProvider
 from coveryield.screening.filters import (
-    add_assignment_probability,
     add_contract_metrics,
+    add_greeks,
     filter_calls,
 )
 
@@ -60,7 +60,7 @@ def enrich_chain(
     if df.empty:
         return pd.DataFrame()
 
-    return add_assignment_probability(df, price)
+    return add_greeks(df, price)
 
 
 def scan_universe(

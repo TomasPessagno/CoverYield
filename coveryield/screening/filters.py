@@ -10,7 +10,8 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from coveryield.pricing.black_scholes import call_delta
+from coveryield.market_time import days_to_expiry, market_now, years_to_expiry
+from coveryield.pricing.black_scholes import DEFAULT_RISK_FREE_RATE, CallGreeks, call_greeks
 
 # Strikes below this fraction of the stock price are deep in the money and dropped.
 MIN_STRIKE_FRACTION = 0.90
@@ -42,7 +43,7 @@ def filter_calls(
     if options_df.empty:
         return pd.DataFrame()
 
-    now = now or datetime.now()
+    now = now or market_now()
     min_expiry = now + timedelta(days=min_days_to_expiry)
     max_expiry = now + timedelta(days=max_days_to_expiry)
 
@@ -78,13 +79,16 @@ def add_contract_metrics(
     """
     Add derived per-contract metrics to a frame produced by ``filter_calls``.
 
-    Days to Expiry, Annualized Return % (0 when expiry is today or past),
+    Days to Expiry (calendar days), Years to Expiry (to the 4pm close, the
+    Black-Scholes T), Annualized Return % (0 when expiry is today or past),
     Distance to Strike %, Breakeven Price, Volume, Open Interest and IV (in percent).
+    ``now`` is New York wall time (see ``coveryield.market_time``).
     """
     out = df.copy()
-    now = now or datetime.now()
+    now = now or market_now()
 
-    out["Days to Expiry"] = (out["expirationDate"] - now).dt.days
+    out["Days to Expiry"] = days_to_expiry(out["expirationDate"], now)
+    out["Years to Expiry"] = years_to_expiry(out["expirationDate"], now)
     dte = out["Days to Expiry"]
     out["Annualized Return %"] = (out["Static Return %"] * (365 / dte.where(dte > 0))).fillna(0.0)
 
@@ -97,18 +101,55 @@ def add_contract_metrics(
     return out
 
 
-def add_assignment_probability(df: pd.DataFrame, current_price: float) -> pd.DataFrame:
-    """Add ``Assignment Prob``: Black-Scholes call delta from each contract's own IV.
+# Columns added by ``add_greeks``, in display units (per share).
+GREEK_COLUMNS = (
+    "Assignment Prob",  # N(d2): probability the stock ends above the strike
+    "Delta",  # call price change per $1 stock move
+    "Gamma",  # delta change per $1 stock move
+    "Theta/Day",  # call price change per calendar day (negative)
+    "Vega",  # call price change per 1 percentage point of volatility
+    "Rho",  # call price change per 1 percentage point of interest rate
+    "Model Price",  # Black-Scholes price at the contract's own IV
+    "d1",
+    "d2",
+)
 
-    Expects ``Days to Expiry`` (see ``add_contract_metrics``). Contracts with no
-    usable IV or an expiry of today get ``None``.
+
+def _greek_values(greeks: CallGreeks | None) -> tuple[float | None, ...]:
+    if greeks is None:
+        return (None,) * len(GREEK_COLUMNS)
+    return (
+        greeks.prob_itm,
+        greeks.delta,
+        greeks.gamma,
+        greeks.theta / 365.0,
+        greeks.vega / 100.0,
+        greeks.rho / 100.0,
+        greeks.price,
+        greeks.d1,
+        greeks.d2,
+    )
+
+
+def add_greeks(
+    df: pd.DataFrame, current_price: float, r: float = DEFAULT_RISK_FREE_RATE
+) -> pd.DataFrame:
+    """Add Black-Scholes Greeks and the assignment probability from each contract's own IV.
+
+    ``Assignment Prob`` is N(d2), the model's probability that the stock finishes
+    above the strike. Expects ``Years to Expiry`` (see ``add_contract_metrics``).
+    Contracts with no usable IV or already past their expiry close get ``None``
+    in every column.
     """
     out = df.copy()
     iv_decimal = numeric_column(out, "impliedVolatility")
-    out["Assignment Prob"] = [
-        call_delta(current_price, strike, dte / 365.0, iv)
-        for strike, dte, iv in zip(out["Strike"], out["Days to Expiry"], iv_decimal, strict=True)
+    rows = [
+        _greek_values(call_greeks(current_price, strike, t, iv, r))
+        for strike, t, iv in zip(out["Strike"], out["Years to Expiry"], iv_decimal, strict=True)
     ]
+    values = pd.DataFrame(rows, columns=list(GREEK_COLUMNS), index=out.index, dtype=object)
+    for column in GREEK_COLUMNS:
+        out[column] = values[column]
     return out
 
 

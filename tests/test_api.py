@@ -1,5 +1,4 @@
 from collections.abc import Iterator
-from datetime import datetime
 
 import pytest
 
@@ -11,17 +10,18 @@ from api.settings import Settings  # noqa: E402
 from coveryield.data.provider import CallChain  # noqa: E402
 from coveryield.data.service import ChainService  # noqa: E402
 from coveryield.data.store import MemoryStore  # noqa: E402
+from coveryield.market_time import market_now  # noqa: E402
 from tests.conftest import FakeProvider, make_calls  # noqa: E402
 
 
 def chain(ticker: str, price: float = 100.0) -> CallChain:
     calls = make_calls(
         [
-            {"strike": price * 1.05, "days": 30.5, "bid": price * 0.02, "iv": 0.30},  # 5% OTM
-            {"strike": price * 1.02, "days": 30.5, "bid": price * 0.03, "iv": 0.30},  # 2% OTM
-            {"strike": price * 1.10, "days": 30.5, "bid": 0.0},  # zero bid
+            {"strike": price * 1.05, "days": 30, "bid": price * 0.02, "iv": 0.30},  # 5% OTM
+            {"strike": price * 1.02, "days": 30, "bid": price * 0.03, "iv": 0.30},  # 2% OTM
+            {"strike": price * 1.10, "days": 30, "bid": 0.0},  # zero bid
         ],
-        now=datetime.now(),
+        now=market_now(),
     )
     calls["contractSymbol"] = [f"{ticker}{i}" for i in range(len(calls))]
     return CallChain(ticker, price, price * 0.99, calls)
@@ -81,7 +81,10 @@ def test_screener_returns_contracts_with_metrics(client: TestClient) -> None:
     assert c["static_return_pct"] == pytest.approx(2.0)
     assert c["distance_to_strike_pct"] == pytest.approx(5.0)
     assert c["days_to_expiry"] == 30
-    assert 0 < c["assignment_prob"] < 0.5
+    assert 0 < c["assignment_prob"] < c["delta"] < 0.5
+    assert c["theta_per_day"] < 0 < c["gamma"]
+    assert c["vega"] > 0 and c["rho"] > 0 and c["model_price"] > 0
+    assert body["risk_free_rate"] == pytest.approx(0.045)
 
 
 def test_screener_without_day_limits_returns_every_expiry(client: TestClient) -> None:
