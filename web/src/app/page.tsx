@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ContractPanel } from "@/components/ContractPanel";
 import { DataTable, type Column } from "@/components/DataTable";
 import {
+  Checkbox,
   ErrorNote,
   Field,
   NumberInput,
@@ -52,6 +53,8 @@ export default function ScreenerPage() {
   const [maxOffset, setMaxOffset] = useState<number | null>(null); // null = no upper limit
   const [minStatic, setMinStatic] = useState(0);
   const [minAnnual, setMinAnnual] = useState(0);
+  // Calls nobody will pay for (bid $0) can't be sold, so they're hidden unless asked for.
+  const [showNoBid, setShowNoBid] = useState(false);
 
   useEffect(() => {
     api.universe().then(setUniverse).catch(() => {});
@@ -109,6 +112,7 @@ export default function ScreenerPage() {
   const contracts =
     data?.contracts.filter(
       (c) =>
+        (showNoBid || c.bid > 0) &&
         c.strike >= data.price + minOffset &&
         (maxOffset === null || c.strike <= data.price + maxOffset) &&
         c.static_return_pct >= minStatic &&
@@ -149,6 +153,7 @@ export default function ScreenerPage() {
               `strike +$${minOffset} to ${maxOffset === null ? "no max" : `+$${maxOffset}`}`,
               ...(minStatic > 0 ? [`static ≥ ${fmtPct(minStatic, 1)}`] : []),
               ...(minAnnual > 0 ? [`annual ≥ ${fmtPct(minAnnual, 0)}`] : []),
+              ...(showNoBid ? ["incl. no bid"] : []),
               `${contracts.length} contracts`,
             ].join(" · ")}
           />
@@ -156,8 +161,16 @@ export default function ScreenerPage() {
           <Panel
             title="Filtered options chain"
             right={
-              <span className="num text-xs text-muted">
-                {contracts.length} of {data.contracts.length} contracts
+              <span className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+                <Checkbox
+                  label="Show contracts with no bid"
+                  checked={showNoBid}
+                  onChange={setShowNoBid}
+                  hint="A $0.00 bid means nobody will pay anything for the call right now, so you can't collect a premium by selling it. These are usually strikes far from the stock price close to expiry. They're hidden by default."
+                />
+                <span className="num text-xs text-muted">
+                  {contracts.length} of {data.contracts.length} contracts
+                </span>
               </span>
             }
           >

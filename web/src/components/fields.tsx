@@ -36,6 +36,34 @@ export function Field({
   );
 }
 
+/** A small labelled checkbox, with an optional (?) explanation. */
+export function Checkbox({
+  label,
+  checked,
+  onChange,
+  hint,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  hint?: ReactNode;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-text-2 hover:text-text">
+        <input
+          type="checkbox"
+          className="h-3.5 w-3.5 cursor-pointer"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+        />
+        {label}
+      </label>
+      {hint && <InfoTip label={label}>{hint}</InfoTip>}
+    </span>
+  );
+}
+
 const inputClass =
   "num h-9 w-full rounded-sm border border-border bg-panel px-2.5 text-sm text-text outline-none transition-colors hover:border-border-strong focus:border-accent";
 

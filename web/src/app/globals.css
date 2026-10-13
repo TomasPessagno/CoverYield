@@ -115,7 +115,8 @@ body {
   color: var(--muted);
 }
 
-input[type="range"] {
+input[type="range"],
+input[type="checkbox"] {
   accent-color: var(--accent);
 }
 
