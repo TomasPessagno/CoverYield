@@ -6,12 +6,14 @@ frames can be shown directly.
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timedelta
 
 import pandas as pd
 
 from coveryield.market_time import days_to_expiry, market_now, years_to_expiry
 from coveryield.pricing.black_scholes import DEFAULT_RISK_FREE_RATE, CallGreeks, call_greeks
+from coveryield.pricing.implied_vol import implied_vol
 
 # Strikes below this fraction of the stock price are deep in the money and dropped.
 MIN_STRIKE_FRACTION = 0.90
@@ -97,7 +99,8 @@ def add_contract_metrics(
 
     out["Volume"] = numeric_column(out, "volume").astype(int)
     out["Open Interest"] = numeric_column(out, "openInterest").astype(int)
-    out["IV"] = numeric_column(out, "impliedVolatility") * 100
+    # The data source's own IV, kept for comparison; add_greeks solves our own.
+    out["Yahoo IV"] = numeric_column(out, "impliedVolatility") * 100
     return out
 
 
@@ -109,7 +112,7 @@ GREEK_COLUMNS = (
     "Theta/Day",  # call price change per calendar day (negative)
     "Vega",  # call price change per 1 percentage point of volatility
     "Rho",  # call price change per 1 percentage point of interest rate
-    "Model Price",  # Black-Scholes price at the contract's own IV
+    "Model Price",  # Black-Scholes price at our IV (equals the mid by construction)
     "d1",
     "d2",
 )
@@ -131,25 +134,56 @@ def _greek_values(greeks: CallGreeks | None) -> tuple[float | None, ...]:
     )
 
 
+def mid_implied_vol(
+    bid: float, ask: float, spot: float, strike: float, t_years: float, r: float
+) -> float | None:
+    """Implied volatility (decimal) solved from the bid/ask mid, or None.
+
+    Needs a two-sided quote (bid > 0, ask >= bid): a mid built from a zero bid
+    or a crossed market isn't a price anyone traded at.
+    """
+    if not (bid > 0 and ask >= bid):
+        return None
+    return implied_vol((bid + ask) / 2, spot, strike, t_years, r)
+
+
 def add_greeks(
     df: pd.DataFrame, current_price: float, r: float = DEFAULT_RISK_FREE_RATE
 ) -> pd.DataFrame:
-    """Add Black-Scholes Greeks and the assignment probability from each contract's own IV.
+    """Solve each contract's implied volatility from its mid, then add the Greeks.
 
-    ``Assignment Prob`` is N(d2), the model's probability that the stock finishes
-    above the strike. Expects ``Years to Expiry`` (see ``add_contract_metrics``).
-    Contracts with no usable IV or already past their expiry close get ``None``
-    in every column.
+    ``IV`` (percent) is our own implied volatility, so Black-Scholes reproduces
+    the mid price exactly. ``Assignment Prob`` is N(d2), the model's probability
+    that the stock finishes above the strike. Expects ``Years to Expiry`` and the
+    quote columns (see ``filter_calls`` and ``add_contract_metrics``). Contracts
+    whose quote no volatility can explain, or that are past their expiry close,
+    get NaN for IV and ``None`` for every Greek. ``Yahoo Model Price`` is the
+    Black-Scholes price at the data source's IV, for comparison.
     """
     out = df.copy()
-    iv_decimal = numeric_column(out, "impliedVolatility")
+    ivs = [
+        mid_implied_vol(bid, ask, current_price, strike, t, r)
+        for bid, ask, strike, t in zip(
+            out["BidPrice"], out["AskPrice"], out["Strike"], out["Years to Expiry"], strict=True
+        )
+    ]
+    out["IV"] = [math.nan if iv is None else iv * 100 for iv in ivs]
     rows = [
-        _greek_values(call_greeks(current_price, strike, t, iv, r))
-        for strike, t, iv in zip(out["Strike"], out["Years to Expiry"], iv_decimal, strict=True)
+        _greek_values(None if iv is None else call_greeks(current_price, strike, t, iv, r))
+        for strike, t, iv in zip(out["Strike"], out["Years to Expiry"], ivs, strict=True)
     ]
     values = pd.DataFrame(rows, columns=list(GREEK_COLUMNS), index=out.index, dtype=object)
     for column in GREEK_COLUMNS:
         out[column] = values[column]
+
+    # For comparison: what Black-Scholes would say using the data source's IV.
+    yahoo_prices = [
+        call_greeks(current_price, strike, t, yahoo_iv / 100, r)
+        for strike, t, yahoo_iv in zip(
+            out["Strike"], out["Years to Expiry"], out["Yahoo IV"], strict=True
+        )
+    ]
+    out["Yahoo Model Price"] = [math.nan if g is None else g.price for g in yahoo_prices]
     return out
 
 

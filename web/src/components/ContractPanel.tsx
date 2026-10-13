@@ -53,7 +53,8 @@ export function ContractPanel({
               {c.ticker} {fmtUsd(c.strike)} call
             </h2>
             <p className="num mt-0.5 text-xs text-muted">
-              Expires {fmtDate(c.expiration)} · {c.days_to_expiry} days · stock {fmtUsd(price)} ·{" "}
+              Expires {fmtDate(c.expiration)} · {c.days_to_expiry}{" "}
+              {c.days_to_expiry === 1 ? "day" : "days"} · stock {fmtUsd(price)} ·{" "}
               <YahooLink contractSymbol={c.contract_symbol} />
             </p>
           </div>
@@ -92,7 +93,7 @@ function Breakdown({ c, price, rate }: { c: Contract; price: number; rate: numbe
 
   const sharesLike = (d: number) => Math.round(n * (1 - d));
   const deltaUp = Math.min(delta + gamma, 1); // delta after a $1 rise (gamma's linear estimate)
-  const sigma = c.iv_pct / 100;
+  const sigma = (c.iv_pct ?? 0) / 100; // the panel only shows Greeks when an IV was solved
   const dailyMove = price * sigma * Math.sqrt(1 / 365);
   const dailySwing = gamma * dailyMove;
 
@@ -146,19 +147,40 @@ function Breakdown({ c, price, rate }: { c: Contract; price: number; rate: numbe
         </ul>
       </section>
 
-      {c.model_price != null && (
+      {c.iv_pct != null && (
         <section>
-          <p className="label">Model check · per share</p>
-          <dl className="num mt-2 grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
-            <dt className="text-text-2">Black-Scholes price</dt>
-            <dd className="text-text">{fmtUsd(c.model_price)}</dd>
-            <dt className="text-text-2">Market quote</dt>
-            <dd className="text-text">
-              {fmtUsd(c.bid)} bid / {fmtUsd(c.ask)} ask
-            </dd>
-          </dl>
+          <p className="label">Implied volatility · price per share</p>
+          <table className="num mt-2 w-full text-sm">
+            <thead>
+              <tr className="text-xs text-muted">
+                <th className="pb-1 text-left font-normal" />
+                <th className="pb-1 text-right font-normal">IV</th>
+                <th className="pb-1 text-right font-normal">Price</th>
+              </tr>
+            </thead>
+            <tbody className="text-text">
+              <tr>
+                <th className="py-0.5 text-left font-normal text-text-2">Market (mid)</th>
+                <td className="py-0.5 text-right text-muted">—</td>
+                <td className="py-0.5 text-right">{fmtUsd(c.mid)}</td>
+              </tr>
+              <tr>
+                <th className="py-0.5 text-left font-normal text-text-2">Ours</th>
+                <td className="py-0.5 text-right">{fmtPct(c.iv_pct, 1)}</td>
+                <td className="py-0.5 text-right">{c.model_price == null ? "—" : fmtUsd(c.model_price)}</td>
+              </tr>
+              <tr>
+                <th className="py-0.5 text-left font-normal text-text-2">Yahoo</th>
+                <td className="py-0.5 text-right">{fmtPct(c.yahoo_iv_pct, 1)}</td>
+                <td className="py-0.5 text-right">
+                  {c.yahoo_model_price == null ? "—" : fmtUsd(c.yahoo_model_price)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
           <p className="mt-1.5 text-xs text-muted">
-            The model uses Yahoo&apos;s implied volatility for this contract.
+            Our IV is solved so that Black-Scholes matches the market mid; every number above uses
+            it.
           </p>
         </section>
       )}
@@ -221,7 +243,14 @@ function Greek({
 }
 
 function Formulas({ c, price, rate }: { c: Contract; price: number; rate: number }) {
-  if (c.d1 == null || c.d2 == null || c.delta == null || c.assignment_prob == null) return null;
+  if (
+    c.d1 == null ||
+    c.d2 == null ||
+    c.delta == null ||
+    c.assignment_prob == null ||
+    c.iv_pct == null
+  )
+    return null;
   const S = fx(price, 2);
   const K = fx(c.strike, 2);
   const t = fx(c.years_to_expiry, 4);
@@ -241,7 +270,7 @@ function Formulas({ c, price, rate }: { c: Contract; price: number; rate: number
     ["Stock", `S = ${S}`],
     ["Strike", `K = ${K}`],
     ["Time", `T = ${daysLeft}/365 = ${t}`, "years, to the 4pm close"],
-    ["Volatility", `\\sigma = ${sigma}`],
+    ["Volatility", `\\sigma = ${sigma}`, `solved from the ${fmtUsd(c.mid)} mid`],
     ["Rate", `r = ${r}`],
   ];
 

@@ -129,7 +129,8 @@ def _contract_fields(row: dict[str, Any]) -> dict[str, Any]:
         "breakeven": _num(row["Breakeven Price"]),
         "volume": int(_num(row["Volume"])),
         "open_interest": int(_num(row["Open Interest"])),
-        "iv_pct": _num(row["IV"]),
+        "iv_pct": _optional(row["IV"]),
+        "yahoo_iv_pct": _num(row["Yahoo IV"]),
         "assignment_prob": _optional(row.get("Assignment Prob")),
         "delta": _optional(row.get("Delta")),
         "gamma": _optional(row.get("Gamma")),
@@ -137,6 +138,7 @@ def _contract_fields(row: dict[str, Any]) -> dict[str, Any]:
         "vega": _optional(row.get("Vega")),
         "rho": _optional(row.get("Rho")),
         "model_price": _optional(row.get("Model Price")),
+        "yahoo_model_price": _optional(row.get("Yahoo Model Price")),
         "d1": _optional(row.get("d1")),
         "d2": _optional(row.get("d2")),
     }

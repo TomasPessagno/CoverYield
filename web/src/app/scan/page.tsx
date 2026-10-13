@@ -295,7 +295,13 @@ const OPPORTUNITY_COLUMNS: Column<Opportunity>[] = [
   { key: "annual", header: "Annual", hint: GLOSSARY.annual, value: (o) => o.annualized_return_pct, render: (o) => fmtPct(o.annualized_return_pct, 1) },
   perDayColumn<Opportunity>(),
   assignColumn<Opportunity>(),
-  { key: "iv", header: "IV", hint: GLOSSARY.iv, value: (o) => o.iv_pct, render: (o) => fmtPct(o.iv_pct, 0) },
+  {
+    key: "iv",
+    header: "IV",
+    hint: GLOSSARY.iv,
+    value: (o) => o.iv_pct ?? null,
+    render: (o) => (o.iv_pct == null ? "—" : fmtPct(o.iv_pct, 0)),
+  },
   { key: "oi", header: "OI", hint: GLOSSARY.oi, value: (o) => o.open_interest, render: (o) => fmtInt(o.open_interest) },
   {
     key: "contract",

@@ -243,9 +243,14 @@ export interface components {
             open_interest: number;
             /**
              * Iv Pct
-             * @description implied volatility, in percent
+             * @description Implied volatility in percent, solved from the bid/ask mid (null when no volatility explains the quote)
              */
-            iv_pct: number;
+            iv_pct: number | null;
+            /**
+             * Yahoo Iv Pct
+             * @description The data source's own implied volatility, in percent
+             */
+            yahoo_iv_pct: number;
             /**
              * Assignment Prob
              * @description N(d2): Black-Scholes probability the stock finishes above the strike
@@ -278,9 +283,14 @@ export interface components {
             rho: number | null;
             /**
              * Model Price
-             * @description Black-Scholes price at this contract's IV
+             * @description Black-Scholes price at our IV (equals the mid by construction)
              */
             model_price: number | null;
+            /**
+             * Yahoo Model Price
+             * @description Black-Scholes price at the data source's IV, for comparison
+             */
+            yahoo_model_price: number | null;
             /** D1 */
             d1: number | null;
             /** D2 */
@@ -398,9 +408,14 @@ export interface components {
             open_interest: number;
             /**
              * Iv Pct
-             * @description implied volatility, in percent
+             * @description Implied volatility in percent, solved from the bid/ask mid (null when no volatility explains the quote)
              */
-            iv_pct: number;
+            iv_pct: number | null;
+            /**
+             * Yahoo Iv Pct
+             * @description The data source's own implied volatility, in percent
+             */
+            yahoo_iv_pct: number;
             /**
              * Assignment Prob
              * @description N(d2): Black-Scholes probability the stock finishes above the strike
@@ -433,9 +448,14 @@ export interface components {
             rho: number | null;
             /**
              * Model Price
-             * @description Black-Scholes price at this contract's IV
+             * @description Black-Scholes price at our IV (equals the mid by construction)
              */
             model_price: number | null;
+            /**
+             * Yahoo Model Price
+             * @description Black-Scholes price at the data source's IV, for comparison
+             */
+            yahoo_model_price: number | null;
             /** D1 */
             d1: number | null;
             /** D2 */

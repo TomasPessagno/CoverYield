@@ -457,9 +457,21 @@
             "title": "Open Interest"
           },
           "iv_pct": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Iv Pct",
-            "description": "implied volatility, in percent"
+            "description": "Implied volatility in percent, solved from the bid/ask mid (null when no volatility explains the quote)"
+          },
+          "yahoo_iv_pct": {
+            "type": "number",
+            "title": "Yahoo Iv Pct",
+            "description": "The data source's own implied volatility, in percent"
           },
           "assignment_prob": {
             "anyOf": [
@@ -543,7 +555,19 @@
               }
             ],
             "title": "Model Price",
-            "description": "Black-Scholes price at this contract's IV"
+            "description": "Black-Scholes price at our IV (equals the mid by construction)"
+          },
+          "yahoo_model_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yahoo Model Price",
+            "description": "Black-Scholes price at the data source's IV, for comparison"
           },
           "d1": {
             "anyOf": [
@@ -587,6 +611,7 @@
           "volume",
           "open_interest",
           "iv_pct",
+          "yahoo_iv_pct",
           "assignment_prob",
           "delta",
           "gamma",
@@ -594,6 +619,7 @@
           "vega",
           "rho",
           "model_price",
+          "yahoo_model_price",
           "d1",
           "d2"
         ],
@@ -786,9 +812,21 @@
             "title": "Open Interest"
           },
           "iv_pct": {
-            "type": "number",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Iv Pct",
-            "description": "implied volatility, in percent"
+            "description": "Implied volatility in percent, solved from the bid/ask mid (null when no volatility explains the quote)"
+          },
+          "yahoo_iv_pct": {
+            "type": "number",
+            "title": "Yahoo Iv Pct",
+            "description": "The data source's own implied volatility, in percent"
           },
           "assignment_prob": {
             "anyOf": [
@@ -872,7 +910,19 @@
               }
             ],
             "title": "Model Price",
-            "description": "Black-Scholes price at this contract's IV"
+            "description": "Black-Scholes price at our IV (equals the mid by construction)"
+          },
+          "yahoo_model_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yahoo Model Price",
+            "description": "Black-Scholes price at the data source's IV, for comparison"
           },
           "d1": {
             "anyOf": [
@@ -944,6 +994,7 @@
           "volume",
           "open_interest",
           "iv_pct",
+          "yahoo_iv_pct",
           "assignment_prob",
           "delta",
           "gamma",
@@ -951,6 +1002,7 @@
           "vega",
           "rho",
           "model_price",
+          "yahoo_model_price",
           "d1",
           "d2",
           "price",

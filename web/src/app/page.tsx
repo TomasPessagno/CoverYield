@@ -401,7 +401,13 @@ function screenerColumns(price: number): Column<Contract>[] {
     },
     perDayColumn<Contract>(),
     assignColumn<Contract>(),
-    { key: "iv", header: "IV", hint: GLOSSARY.iv, value: (c) => c.iv_pct, render: (c) => fmtPct(c.iv_pct, 1) },
+    {
+      key: "iv",
+      header: "IV",
+      hint: GLOSSARY.iv,
+      value: (c) => c.iv_pct ?? null,
+      render: (c) => (c.iv_pct == null ? "—" : fmtPct(c.iv_pct, 1)),
+    },
     { key: "vol", header: "Volume", hint: GLOSSARY.volume, value: (c) => c.volume, render: (c) => fmtInt(c.volume) },
     { key: "oi", header: "OI", hint: GLOSSARY.oi, value: (c) => c.open_interest, render: (c) => fmtInt(c.open_interest) },
     {

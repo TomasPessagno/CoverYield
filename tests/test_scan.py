@@ -5,6 +5,7 @@ import pytest
 
 from coveryield.data.provider import CallChain
 from coveryield.pricing.black_scholes import call_greeks
+from coveryield.pricing.implied_vol import implied_vol
 from coveryield.screening.scan import scan_one_ticker, scan_universe
 from tests.conftest import FakeProvider, make_calls
 
@@ -12,7 +13,7 @@ from tests.conftest import FakeProvider, make_calls
 def chain(ticker: str, price: float = 100.0) -> CallChain:
     calls = make_calls(
         [
-            {"strike": 105, "days": 30, "bid": 2.0, "iv": 0.30},
+            {"strike": 105, "days": 30, "bid": 2.0, "ask": 2.2},
             {"strike": 110, "days": 30, "bid": 0.0},  # zero bid -> dropped
             {"strike": 105, "days": 0, "bid": 1.0},  # expires today -> dropped
         ]
@@ -29,8 +30,17 @@ def test_scan_one_ticker_enriches_and_gates(now: datetime) -> None:
     assert row["Days to Expiry"] == 30
     # Noon to the 4pm close 30 days later: 30 days and 4 hours.
     assert row["Years to Expiry"] == pytest.approx((30 + 4 / 24) / 365)
-    greeks = call_greeks(100.0, 105, (30 + 4 / 24) / 365, 0.30)
+    # IV is solved from the $2.10 mid, and the Greeks use it.
+    t = (30 + 4 / 24) / 365
+    iv = implied_vol(2.10, 100.0, 105, t)
+    assert iv is not None
+    assert row["IV"] == pytest.approx(iv * 100)
+    greeks = call_greeks(100.0, 105, t, iv)
     assert greeks is not None
+    assert row["Model Price"] == pytest.approx(2.10)
+    yahoo = call_greeks(100.0, 105, t, 0.30)  # the fixture's data-source IV
+    assert yahoo is not None
+    assert row["Yahoo Model Price"] == pytest.approx(yahoo.price)
     assert row["Assignment Prob"] == pytest.approx(greeks.prob_itm)
     assert row["Delta"] == pytest.approx(greeks.delta)
     assert row["Theta/Day"] == pytest.approx(greeks.theta / 365)

@@ -42,7 +42,11 @@ class Contract(BaseModel):
     breakeven: float = Field(description="stock price minus the premium collected")
     volume: int
     open_interest: int
-    iv_pct: float = Field(description="implied volatility, in percent")
+    iv_pct: float | None = Field(
+        description="Implied volatility in percent, solved from the bid/ask mid "
+        "(null when no volatility explains the quote)"
+    )
+    yahoo_iv_pct: float = Field(description="The data source's own implied volatility, in percent")
     assignment_prob: float | None = Field(
         description="N(d2): Black-Scholes probability the stock finishes above the strike"
     )
@@ -57,7 +61,12 @@ class Contract(BaseModel):
     rho: float | None = Field(
         description="Call price change per 1 percentage point of interest rate, per share"
     )
-    model_price: float | None = Field(description="Black-Scholes price at this contract's IV")
+    model_price: float | None = Field(
+        description="Black-Scholes price at our IV (equals the mid by construction)"
+    )
+    yahoo_model_price: float | None = Field(
+        description="Black-Scholes price at the data source's IV, for comparison"
+    )
     d1: float | None
     d2: float | None
 

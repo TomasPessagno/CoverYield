@@ -17,8 +17,8 @@ from tests.conftest import FakeProvider, make_calls  # noqa: E402
 def chain(ticker: str, price: float = 100.0) -> CallChain:
     calls = make_calls(
         [
-            {"strike": price * 1.05, "days": 30, "bid": price * 0.02, "iv": 0.30},  # 5% OTM
-            {"strike": price * 1.02, "days": 30, "bid": price * 0.03, "iv": 0.30},  # 2% OTM
+            {"strike": price * 1.05, "days": 30, "bid": price * 0.02, "ask": price * 0.021},
+            {"strike": price * 1.02, "days": 30, "bid": price * 0.03, "ask": price * 0.031},
             {"strike": price * 1.10, "days": 30, "bid": 0.0},  # zero bid
         ],
         now=market_now(),
@@ -83,7 +83,10 @@ def test_screener_returns_contracts_with_metrics(client: TestClient) -> None:
     assert c["days_to_expiry"] == 30
     assert 0 < c["assignment_prob"] < c["delta"] < 0.5
     assert c["theta_per_day"] < 0 < c["gamma"]
-    assert c["vega"] > 0 and c["rho"] > 0 and c["model_price"] > 0
+    assert c["vega"] > 0 and c["rho"] > 0
+    assert c["model_price"] == pytest.approx(c["mid"])  # our IV reproduces the mid
+    assert c["iv_pct"] > 0 and c["yahoo_iv_pct"] == pytest.approx(30.0)
+    assert c["yahoo_model_price"] > 0
     assert body["risk_free_rate"] == pytest.approx(0.045)
 
 

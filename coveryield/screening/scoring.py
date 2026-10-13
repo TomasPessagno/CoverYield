@@ -49,7 +49,8 @@ def compute_opportunity_score(df: pd.DataFrame, weights: Mapping[str, float]) ->
     out["s_liq"] = (oi * 0.5 + vol * 0.3 + spread_quality * 0.2) * 100
 
     # 10% Volatility — reward moderate IV (~30%), penalize extremes
-    out["s_vol"] = (100 - (out["IV"] - 30).abs() * 1.5).clip(0, 100)
+    # (neutral 50 when no implied volatility could be solved from the quote)
+    out["s_vol"] = (100 - (out["IV"] - 30).abs() * 1.5).clip(0, 100).fillna(50.0)
 
     # 5% Dividend — placeholder neutral (ex-div timing is a v2 item)
     out["s_div"] = 50.0

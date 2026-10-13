@@ -26,7 +26,7 @@ export const GLOSSARY = {
     "Theta (Θ = ∂C/∂t): how much value the call loses each day. You sold it, so that's what you earn per day per contract (100 shares) if nothing else changes.",
   assign:
     "Probability in the money: the Black-Scholes chance, N(d₂), that the stock ends above the strike at expiry, so your shares get called away. Early assignment (usually just before a dividend) isn't included. Click a row for the full breakdown.",
-  iv: "Implied volatility: how much the market expects the stock to move over a year, backed out of the option's price. Higher IV means bigger premiums and bigger moves.",
+  iv: "Implied volatility: how much the market expects the stock to move over a year. It's the volatility at which Black-Scholes gives this option's market price (solved from the bid/ask mid). Higher IV means bigger premiums and bigger moves. — means no volatility explains the quote (e.g. no bid).",
   volume: "Contracts traded today. More means an active market.",
   oi: "Open interest: how many of these contracts are currently open. More means it's easier to trade at a fair price.",
   contract: "Open this exact contract on Yahoo Finance.",

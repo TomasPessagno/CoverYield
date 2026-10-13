@@ -51,9 +51,9 @@ export function RiskRewardChart({ contracts }: { contracts: Contract[] }) {
   const [x0, x1] = extent(contracts.map((c) => c.distance_to_strike_pct));
   const [y0raw, y1] = extent(contracts.map((c) => c.annualized_return_pct));
   const y0 = Math.min(0, y0raw);
-  const ivs = contracts.map((c) => c.iv_pct);
-  const ivLo = Math.min(...ivs);
-  const ivHi = Math.max(...ivs);
+  const ivs = contracts.flatMap((c) => (c.iv_pct == null ? [] : [c.iv_pct]));
+  const ivLo = ivs.length ? Math.min(...ivs) : 0;
+  const ivHi = ivs.length ? Math.max(...ivs) : 0;
   const oiMax = Math.max(1, ...contracts.map((c) => c.open_interest));
 
   const iw = width - M.left - M.right;
@@ -61,7 +61,8 @@ export function RiskRewardChart({ contracts }: { contracts: Contract[] }) {
   const sx = (v: number) => M.left + ((v - x0) / (x1 - x0)) * iw;
   const sy = (v: number) => M.top + ih - ((v - y0) / (y1 - y0)) * ih;
   const sr = (oi: number) => 5 + Math.sqrt(oi / oiMax) * 12;
-  const sc = (iv: number) => ivColor(ivHi > ivLo ? (iv - ivLo) / (ivHi - ivLo) : 0.5);
+  const sc = (iv: number | null | undefined) =>
+    iv == null ? "var(--border-strong)" : ivColor(ivHi > ivLo ? (iv - ivLo) / (ivHi - ivLo) : 0.5);
 
   // Draw big dots first so small ones stay visible on top.
   const order = contracts
@@ -175,7 +176,7 @@ export function RiskRewardChart({ contracts }: { contracts: Contract[] }) {
               ["Annualized", fmtPct(h.annualized_return_pct)],
               ["Static", fmtPct(h.static_return_pct)],
               ["Bid", fmtUsd(h.bid)],
-              ["IV", fmtPct(h.iv_pct, 1)],
+              ["IV", h.iv_pct == null ? "—" : fmtPct(h.iv_pct, 1)],
               ["Open interest", fmtInt(h.open_interest)],
             ] as const
           ).map(([k, v]) => (

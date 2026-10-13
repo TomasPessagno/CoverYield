@@ -4,7 +4,9 @@ import pandas as pd
 import pytest
 
 from coveryield.screening.filters import (
+    GREEK_COLUMNS,
     add_contract_metrics,
+    add_greeks,
     filter_by_goals,
     filter_by_strike_and_return,
     filter_calls,
@@ -61,7 +63,7 @@ def test_add_contract_metrics_worked_example(now: datetime) -> None:
     assert row["Annualized Return %"] == pytest.approx(2.0 * 365 / 30)
     assert row["Distance to Strike %"] == pytest.approx(5.0)
     assert row["Breakeven Price"] == pytest.approx(98.0)
-    assert row["IV"] == pytest.approx(25.0)
+    assert row["Yahoo IV"] == pytest.approx(25.0)
 
 
 def test_annualized_return_is_zero_at_expiry(now: datetime) -> None:
@@ -106,3 +108,21 @@ def test_days_to_expiry_counts_calendar_days(now: datetime) -> None:
     row = add_contract_metrics(filter_calls("TEST", 100.0, calls, 0, 42, now=now), 100.0, now=now)
     assert list(row["Days to Expiry"]) == [1, 3]
     assert row["Years to Expiry"].iloc[0] == pytest.approx((1 + 4 / 24) / 365)
+
+
+def test_add_greeks_skips_quotes_no_volatility_can_explain(now: datetime) -> None:
+    calls = make_calls(
+        [
+            {"strike": 105, "days": 30, "bid": 2.0, "ask": 2.2},  # fine
+            {"strike": 105, "days": 30, "bid": 2.2, "ask": 2.0},  # crossed market
+            {"strike": 105, "days": 30, "bid": 0.0, "ask": 0.5},  # no bid
+            {"strike": 90, "days": 30, "bid": 5.0, "ask": 5.2},  # below the ~$10 minimum
+        ]
+    )
+    df = add_contract_metrics(filter_calls("TEST", 100.0, calls, 0, 42, now=now), 100.0, now=now)
+    out = add_greeks(df, 100.0)
+    assert out["IV"].iloc[0] > 0
+    assert out["IV"].iloc[1:].isna().all()
+    for column in GREEK_COLUMNS:
+        assert out[column].iloc[0] is not None
+        assert out[column].iloc[1:].isna().all()
