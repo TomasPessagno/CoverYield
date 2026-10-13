@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { ContractPanel } from "@/components/ContractPanel";
 import { DataTable, type Column } from "@/components/DataTable";
 import { Button, ErrorNote, Field, NumberInput, Panel, SliderInput } from "@/components/fields";
 import {
@@ -12,8 +13,10 @@ import {
   type UniverseTicker,
   type Weights,
 } from "@/lib/api";
+import { assignColumn, perDayColumn } from "@/components/greekColumns";
 import { YahooLink } from "@/components/YahooLink";
 import { fmtDate, fmtInt, fmtPct, fmtTime, fmtUsd } from "@/lib/format";
+import { GLOSSARY } from "@/lib/glossary";
 
 const CONCURRENCY = 4;
 const DEFAULT_WEIGHTS: Weights = { yield: 40, assign: 30, liq: 15, vol: 10, div: 5 };
@@ -42,6 +45,8 @@ export default function ScanPage() {
   const [scanned, setScanned] = useState<string[] | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [lastData, setLastData] = useState<OpportunitiesResponse | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const closePanel = useCallback(() => setSelected(null), []);
 
   useEffect(() => {
     api.universe().then(setUniverse).catch(() => {});
@@ -109,6 +114,7 @@ export default function ScanPage() {
   const data = error ? null : (result?.key === key ? result.data : lastData) ?? null;
   const ranking = key !== null && result?.key !== key;
   const weightTotal = Object.values(weights).reduce((s, w) => s + w, 0) || 1;
+  const selectedOpportunity = data?.results.find((o) => o.contract_symbol === selected) ?? null;
 
   return (
     <div className="flex flex-col gap-4">
@@ -123,7 +129,7 @@ export default function ScanPage() {
           <Field label="Min return (this trade)" hint="Premium / stock price over the contract's life: real cash, not a projection">
             <SliderInput value={minReturn} onChange={setMinReturn} min={0} max={10} step={0.25} format={(v) => fmtPct(v, 2)} />
           </Field>
-          <Field label="Max days to expiry">
+          <Field label="Max days to expiry" hint="Only contracts expiring within this many days.">
             <SliderInput value={maxDte} onChange={setMaxDte} min={1} max={120} format={(v) => `${v}d`} />
           </Field>
           <Field label="Min distance OTM" hint="How far above today's price the strike must be">
@@ -162,10 +168,10 @@ export default function ScanPage() {
       </Panel>
 
       <div className="flex flex-wrap items-end gap-3">
-        <Field label="Universe size" className="w-40">
+        <Field label="Universe size" className="w-40" hint="How many tickers to scan from the built-in list of liquid stocks and ETFs.">
           <NumberInput value={universeSize} onChange={(v) => setUniverseSize(Math.round(v))} min={1} max={universe.length || 57} />
         </Field>
-        <Field label="Show top" className="w-32">
+        <Field label="Show top" className="w-32" hint="How many of the best-scoring contracts to list.">
           <NumberInput value={topN} onChange={(v) => setTopN(Math.round(v))} min={1} max={500} step={10} />
         </Field>
         <Button onClick={runScan} disabled={running || universe.length === 0}>
@@ -190,6 +196,15 @@ export default function ScanPage() {
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
+      {data && selectedOpportunity && (
+        <ContractPanel
+          contract={selectedOpportunity}
+          price={selectedOpportunity.price}
+          rate={data.risk_free_rate}
+          onClose={closePanel}
+        />
+      )}
+
       {data ? (
         <Panel
           title="Ranked opportunities"
@@ -210,6 +225,8 @@ export default function ScanPage() {
               rowKey={(o) => o.contract_symbol}
               initialSort={{ key: "score", dir: "desc" }}
               maxHeight={640}
+              onRowClick={(o) => setSelected(o.contract_symbol)}
+              selectedKey={selected}
             />
           ) : (
             <p className="px-4 py-8 text-center text-sm text-muted">
@@ -249,45 +266,41 @@ const OPPORTUNITY_COLUMNS: Column<Opportunity>[] = [
   {
     key: "score",
     header: "Score",
-    hint: "Opportunity Score 0-100. Hover a score for its components",
+    hint: GLOSSARY.score,
     value: (o) => o.score,
     render: (o) => <ScoreCell o={o} />,
   },
   {
     key: "ticker",
     header: "Ticker",
+    hint: GLOSSARY.ticker,
     align: "left",
     value: (o) => o.ticker,
     render: (o) => <span className="font-medium text-text">{o.ticker}</span>,
   },
-  { key: "price", header: "Price", value: (o) => o.price, render: (o) => fmtUsd(o.price) },
-  { key: "strike", header: "Strike", value: (o) => o.strike, render: (o) => fmtUsd(o.strike) },
-  { key: "dist", header: "Dist", hint: "Distance to strike", value: (o) => o.distance_to_strike_pct, render: (o) => fmtPct(o.distance_to_strike_pct, 1) },
-  { key: "dte", header: "DTE", value: (o) => o.days_to_expiry },
-  { key: "exp", header: "Expiry", value: (o) => o.expiration, render: (o) => fmtDate(o.expiration) },
-  { key: "bid", header: "Premium", hint: "Bid", value: (o) => o.bid, render: (o) => fmtUsd(o.bid) },
+  { key: "price", header: "Price", hint: GLOSSARY.price, value: (o) => o.price, render: (o) => fmtUsd(o.price) },
+  { key: "strike", header: "Strike", hint: GLOSSARY.strikePlain, value: (o) => o.strike, render: (o) => fmtUsd(o.strike) },
+  { key: "dist", header: "Dist", hint: GLOSSARY.dist, value: (o) => o.distance_to_strike_pct, render: (o) => fmtPct(o.distance_to_strike_pct, 1) },
+  { key: "dte", header: "DTE", hint: GLOSSARY.dte, value: (o) => o.days_to_expiry },
+  { key: "exp", header: "Expiry", hint: GLOSSARY.expiry, value: (o) => o.expiration, render: (o) => fmtDate(o.expiration) },
+  { key: "bid", header: "Premium", hint: GLOSSARY.bid, value: (o) => o.bid, render: (o) => fmtUsd(o.bid) },
   {
     key: "static",
     header: "Return",
-    hint: "Actual return on this trade: bid / stock price",
+    hint: GLOSSARY.static,
     value: (o) => o.static_return_pct,
     render: (o) => fmtPct(o.static_return_pct),
     heat: (o) => Math.min(o.static_return_pct / 5, 1),
   },
-  { key: "annual", header: "Annual", value: (o) => o.annualized_return_pct, render: (o) => fmtPct(o.annualized_return_pct, 1) },
-  {
-    key: "assign",
-    header: "P(assign)",
-    hint: "Black-Scholes call delta",
-    value: (o) => o.assignment_prob ?? null,
-    render: (o) => (o.assignment_prob == null ? "—" : fmtPct(o.assignment_prob * 100, 0)),
-  },
-  { key: "iv", header: "IV", value: (o) => o.iv_pct, render: (o) => fmtPct(o.iv_pct, 0) },
-  { key: "oi", header: "OI", hint: "Open interest", value: (o) => o.open_interest, render: (o) => fmtInt(o.open_interest) },
+  { key: "annual", header: "Annual", hint: GLOSSARY.annual, value: (o) => o.annualized_return_pct, render: (o) => fmtPct(o.annualized_return_pct, 1) },
+  perDayColumn<Opportunity>(),
+  assignColumn<Opportunity>(),
+  { key: "iv", header: "IV", hint: GLOSSARY.iv, value: (o) => o.iv_pct, render: (o) => fmtPct(o.iv_pct, 0) },
+  { key: "oi", header: "OI", hint: GLOSSARY.oi, value: (o) => o.open_interest, render: (o) => fmtInt(o.open_interest) },
   {
     key: "contract",
     header: "Contract",
-    hint: "Open this exact contract on Yahoo Finance",
+    hint: GLOSSARY.contract,
     sortable: false,
     value: () => null,
     render: (o) => <YahooLink contractSymbol={o.contract_symbol} />,

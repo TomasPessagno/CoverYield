@@ -1,6 +1,15 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { createContext, useContext, useId, type ReactNode } from "react";
+
+import { InfoTip } from "@/components/InfoTip";
+
+const FieldIdContext = createContext<string | undefined>(undefined);
+
+/** The id the surrounding Field's label points at; inputs use it so the label stays linked. */
+export function useFieldId() {
+  return useContext(FieldIdContext);
+}
 
 export function Field({
   label,
@@ -9,15 +18,21 @@ export function Field({
   className = "",
 }: {
   label: string;
-  hint?: string;
+  hint?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
+  const id = useId();
   return (
-    <label className={`flex min-w-0 flex-col gap-1.5 ${className}`} title={hint}>
-      <span className="label">{label}</span>
-      {children}
-    </label>
+    <div className={`flex min-w-0 flex-col gap-1.5 ${className}`}>
+      <span className="flex items-center gap-1">
+        <label htmlFor={id} className="label">
+          {label}
+        </label>
+        {hint && <InfoTip label={label}>{hint}</InfoTip>}
+      </span>
+      <FieldIdContext.Provider value={id}>{children}</FieldIdContext.Provider>
+    </div>
   );
 }
 
@@ -39,9 +54,11 @@ export function NumberInput({
   step?: number;
   suffix?: string;
 }) {
+  const id = useFieldId();
   return (
     <div className="relative">
       <input
+        id={id}
         type="number"
         className={`${inputClass} ${suffix ? "pr-8" : ""}`}
         value={Number.isFinite(value) ? value : ""}
@@ -78,9 +95,11 @@ export function OptionalNumberInput({
   suffix?: string;
   placeholder?: string;
 }) {
+  const id = useFieldId();
   return (
     <div className="relative">
       <input
+        id={id}
         type="number"
         className={`${inputClass} placeholder:text-muted ${suffix ? "pr-8" : ""}`}
         value={value ?? ""}
@@ -117,9 +136,11 @@ export function SliderInput({
   step?: number;
   format?: (v: number) => string;
 }) {
+  const id = useFieldId();
   return (
     <div className="flex h-9 items-center gap-3">
       <input
+        id={id}
         type="range"
         className="h-1 w-full cursor-pointer"
         value={value}

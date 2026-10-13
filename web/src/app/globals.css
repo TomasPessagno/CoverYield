@@ -92,6 +92,11 @@
   --font-sans: var(--font-geist);
 }
 
+/* Keep the scrollbar's space reserved, so locking scroll under the detail panel doesn't shift the page */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--bg);
   color: var(--text);

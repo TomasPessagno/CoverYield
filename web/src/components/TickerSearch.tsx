@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 
+import { useFieldId } from "@/components/fields";
 import { api, type TickerMatch, type UniverseTicker } from "@/lib/api";
 
 type Option = { symbol: string; label: string };
@@ -24,6 +25,7 @@ export function TickerSearch({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const listId = useId();
+  const fieldId = useFieldId();
   const boxRef = useRef<HTMLDivElement>(null);
 
   const q = query.trim().toLowerCase();
@@ -74,6 +76,7 @@ export function TickerSearch({
   return (
     <div ref={boxRef} className="relative">
       <input
+        id={fieldId}
         role="combobox"
         aria-expanded={open}
         aria-controls={listId}

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { ContractPanel } from "@/components/ContractPanel";
 import { DataTable, type Column } from "@/components/DataTable";
 import {
   ErrorNote,
@@ -13,6 +14,7 @@ import {
 } from "@/components/fields";
 import { RiskRewardChart } from "@/components/RiskRewardChart";
 import { TickerSearch } from "@/components/TickerSearch";
+import { assignColumn, perDayColumn } from "@/components/greekColumns";
 import { YahooLink } from "@/components/YahooLink";
 import { api, errorMessage, type Contract, type ScreenerResponse, type UniverseTicker } from "@/lib/api";
 import {
@@ -25,6 +27,7 @@ import {
   fmtUsd,
   yahooQuoteUrl,
 } from "@/lib/format";
+import { GLOSSARY } from "@/lib/glossary";
 
 const QUICK_PICKS = ["AAPL", "MSFT", "NVDA", "SPY", "KO", "JPM"];
 
@@ -40,6 +43,7 @@ export default function ScreenerPage() {
   const [lastData, setLastData] = useState<ScreenerResponse | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   // Ticks so "12 min ago" and the refresh countdown stay current.
   const [now, setNow] = useState(() => Date.now());
 
@@ -84,6 +88,8 @@ export default function ScreenerPage() {
   const error = result?.key === key ? result.error : undefined;
   const data = error ? null : (result?.key === key ? result.data : lastData) ?? null;
 
+  const closePanel = useCallback(() => setSelected(null), []);
+
   async function scanNow() {
     if (!ticker || !key) return;
     setScanning(true);
@@ -109,10 +115,12 @@ export default function ScreenerPage() {
         c.annualized_return_pct >= minAnnual,
     ) ?? [];
 
+  const selectedContract = data?.contracts.find((c) => c.contract_symbol === selected) ?? null;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]">
-        <Field label="Ticker">
+        <Field label="Ticker" hint="Type a symbol or a company name. Any US stock or ETF with listed options works.">
           <TickerSearch universe={universe} onSubmit={setTicker} />
         </Field>
         <Field label="Min days to expiry" hint="Shortest expiry to include. Leave empty for no limit">
@@ -182,6 +190,8 @@ export default function ScreenerPage() {
                   columns={screenerColumns(data.price)}
                   rowKey={(c) => c.contract_symbol}
                   initialSort={{ key: "dte", dir: "asc" }}
+                  onRowClick={(c) => setSelected(c.contract_symbol)}
+                  selectedKey={selected}
                 />
               </>
             ) : (
@@ -190,6 +200,15 @@ export default function ScreenerPage() {
               </p>
             )}
           </Panel>
+
+          {selectedContract && (
+            <ContractPanel
+              contract={selectedContract}
+              price={data.price}
+              rate={data.risk_free_rate}
+              onClose={closePanel}
+            />
+          )}
 
           {contracts.length > 0 && (
             <Panel title="Risk vs reward">
@@ -339,11 +358,12 @@ const clamp01 = (v: number) => Math.min(Math.max(v, 0), 1);
 
 function screenerColumns(price: number): Column<Contract>[] {
   return [
-    { key: "exp", header: "Expiry", value: (c) => c.expiration, render: (c) => fmtDate(c.expiration) },
-    { key: "dte", header: "DTE", hint: "Days to expiry", value: (c) => c.days_to_expiry },
+    { key: "exp", header: "Expiry", hint: GLOSSARY.expiry, value: (c) => c.expiration, render: (c) => fmtDate(c.expiration) },
+    { key: "dte", header: "DTE", hint: GLOSSARY.dte, value: (c) => c.days_to_expiry },
     {
       key: "strike",
       header: "Strike",
+      hint: GLOSSARY.strike,
       value: (c) => c.strike,
       render: (c) => (
         <>
@@ -354,31 +374,19 @@ function screenerColumns(price: number): Column<Contract>[] {
     {
       key: "dist",
       header: "Dist",
-      hint: "How far the stock must rise to reach the strike",
+      hint: GLOSSARY.dist,
       value: (c) => c.distance_to_strike_pct,
       render: (c) => fmtPct(c.distance_to_strike_pct),
     },
-    { key: "bid", header: "Bid", hint: "Premium you can sell at now", value: (c) => c.bid, render: (c) => fmtUsd(c.bid) },
-    { key: "mid", header: "Mid", value: (c) => c.mid, render: (c) => fmtUsd(c.mid) },
-    { key: "ask", header: "Ask", value: (c) => c.ask, render: (c) => fmtUsd(c.ask) },
-    {
-      key: "spread",
-      header: "Spread",
-      hint: "Ask minus bid: the cost of trading in and out",
-      value: (c) => c.spread,
-      render: (c) => fmtUsd(c.spread),
-    },
-    {
-      key: "be",
-      header: "Breakeven",
-      hint: "Stock price minus the premium collected",
-      value: (c) => c.breakeven,
-      render: (c) => fmtUsd(c.breakeven),
-    },
+    { key: "bid", header: "Bid", hint: GLOSSARY.bid, value: (c) => c.bid, render: (c) => fmtUsd(c.bid) },
+    { key: "mid", header: "Mid", hint: GLOSSARY.mid, value: (c) => c.mid, render: (c) => fmtUsd(c.mid) },
+    { key: "ask", header: "Ask", hint: GLOSSARY.ask, value: (c) => c.ask, render: (c) => fmtUsd(c.ask) },
+    { key: "spread", header: "Spread", hint: GLOSSARY.spread, value: (c) => c.spread, render: (c) => fmtUsd(c.spread) },
+    { key: "be", header: "Breakeven", hint: GLOSSARY.breakeven, value: (c) => c.breakeven, render: (c) => fmtUsd(c.breakeven) },
     {
       key: "static",
       header: "Static",
-      hint: "Bid / stock price: your return if the stock doesn't move",
+      hint: GLOSSARY.static,
       value: (c) => c.static_return_pct,
       render: (c) => fmtPct(c.static_return_pct),
       heat: (c) => clamp01(c.static_return_pct / 5),
@@ -386,25 +394,20 @@ function screenerColumns(price: number): Column<Contract>[] {
     {
       key: "annual",
       header: "Annual",
-      hint: "Static return x 365 / days to expiry",
+      hint: GLOSSARY.annual,
       value: (c) => c.annualized_return_pct,
       render: (c) => fmtPct(c.annualized_return_pct, 1),
       heat: (c) => clamp01(c.annualized_return_pct / 60),
     },
-    {
-      key: "assign",
-      header: "P(assign)",
-      hint: "Black-Scholes call delta: approx. probability the shares get called away",
-      value: (c) => c.assignment_prob ?? null,
-      render: (c) => (c.assignment_prob == null ? "—" : fmtPct(c.assignment_prob * 100, 0)),
-    },
-    { key: "iv", header: "IV", hint: "Implied volatility", value: (c) => c.iv_pct, render: (c) => fmtPct(c.iv_pct, 1) },
-    { key: "vol", header: "Volume", value: (c) => c.volume, render: (c) => fmtInt(c.volume) },
-    { key: "oi", header: "OI", hint: "Open interest", value: (c) => c.open_interest, render: (c) => fmtInt(c.open_interest) },
+    perDayColumn<Contract>(),
+    assignColumn<Contract>(),
+    { key: "iv", header: "IV", hint: GLOSSARY.iv, value: (c) => c.iv_pct, render: (c) => fmtPct(c.iv_pct, 1) },
+    { key: "vol", header: "Volume", hint: GLOSSARY.volume, value: (c) => c.volume, render: (c) => fmtInt(c.volume) },
+    { key: "oi", header: "OI", hint: GLOSSARY.oi, value: (c) => c.open_interest, render: (c) => fmtInt(c.open_interest) },
     {
       key: "link",
       header: "Contract",
-      hint: "Open this exact contract on Yahoo Finance",
+      hint: GLOSSARY.contract,
       sortable: false,
       value: () => null,
       render: (c) => <YahooLink contractSymbol={c.contract_symbol} />,

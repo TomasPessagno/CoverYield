@@ -11,6 +11,7 @@
     "gen:api": "cd .. && python -m api.export_openapi web/openapi.json && cd web && openapi-typescript openapi.json -o src/lib/api-types.ts"
   },
   "dependencies": {
+    "katex": "^0.16.22",
     "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8"
