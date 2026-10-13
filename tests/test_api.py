@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -9,8 +10,9 @@ from api.app import app, get_provider, get_service, get_settings  # noqa: E402
 from api.settings import Settings  # noqa: E402
 from coveryield.data.provider import CallChain  # noqa: E402
 from coveryield.data.service import ChainService  # noqa: E402
-from coveryield.data.store import MemoryStore  # noqa: E402
-from coveryield.market_time import market_now  # noqa: E402
+from coveryield.data.store import MemoryStore, StoredChain  # noqa: E402
+from coveryield.market_time import market_now, to_market_time, years_to_expiry  # noqa: E402
+from coveryield.pricing.black_scholes import call_greeks  # noqa: E402
 from tests.conftest import FakeProvider, make_calls  # noqa: E402
 
 
@@ -175,3 +177,29 @@ def test_opportunities_validates_input(client: TestClient) -> None:
     assert client.post("/api/opportunities", json={"tickers": []}).status_code == 422
     bad_weights = {"tickers": ["AAA"], "weights": {"yield": 500}}
     assert client.post("/api/opportunities", json=bad_weights).status_code == 422
+
+
+def test_stored_snapshot_is_priced_from_its_fetch_time() -> None:
+    # A quote stored 3 days ago, on a call that then had ~7 days left, priced at 30% vol.
+    # Measuring time from today instead would imply a far higher volatility.
+    fetched_at = datetime.now(UTC) - timedelta(days=3)
+    calls = make_calls([{"strike": 105, "days": 4}], now=market_now())
+    t_then = years_to_expiry(calls["expirationDate"], to_market_time(fetched_at)).iloc[0]
+    priced = call_greeks(100.0, 105, t_then, 0.30)
+    assert priced is not None
+    calls["bid"], calls["ask"] = priced.price - 0.005, priced.price + 0.005
+    calls["contractSymbol"] = ["OLD0"]
+
+    store = MemoryStore()
+    store.put("OLD", StoredChain(CallChain("OLD", 100.0, 100.0, calls), fetched_at))
+    service = ChainService(FakeProvider({}), store, cooldown_seconds=600)
+    app.dependency_overrides[get_service] = lambda: service
+    app.dependency_overrides[get_settings] = lambda: Settings("hosted", None, 600, None)
+    try:
+        body = TestClient(app).get("/api/screener/OLD").json()
+    finally:
+        app.dependency_overrides.clear()
+
+    c = body["contracts"][0]
+    assert c["days_to_expiry"] == 4  # the calendar still counts from today
+    assert c["iv_pct"] == pytest.approx(30.0, abs=0.5)

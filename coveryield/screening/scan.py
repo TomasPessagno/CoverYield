@@ -39,9 +39,17 @@ def scan_one_ticker(
 
 
 def enrich_chain(
-    chain: CallChain, min_days: int, max_days: int, now: datetime | None = None
+    chain: CallChain,
+    min_days: int,
+    max_days: int,
+    now: datetime | None = None,
+    quoted_at: datetime | None = None,
 ) -> pd.DataFrame:
-    """Filter an already-fetched chain and add the metrics the scoring engine needs."""
+    """Filter an already-fetched chain and add the metrics the scoring engine needs.
+
+    ``quoted_at`` is when the chain was fetched, for pricing stored snapshots
+    (see ``add_contract_metrics``).
+    """
     if chain.is_empty:
         return pd.DataFrame()
     price = chain.price
@@ -55,7 +63,7 @@ def enrich_chain(
         return pd.DataFrame()
 
     df["Current Price"] = price
-    df = add_contract_metrics(df, price, now=now)
+    df = add_contract_metrics(df, price, now=now, quoted_at=quoted_at)
     df = df[df["Days to Expiry"] > 0].copy()
     if df.empty:
         return pd.DataFrame()

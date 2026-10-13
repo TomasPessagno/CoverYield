@@ -21,6 +21,13 @@ def market_now() -> datetime:
     return datetime.now(NEW_YORK).replace(tzinfo=None)
 
 
+def to_market_time(moment: datetime) -> datetime:
+    """A timezone-aware moment as naive New York wall time (naive input is returned as is)."""
+    if moment.tzinfo is None:
+        return moment
+    return moment.astimezone(NEW_YORK).replace(tzinfo=None)
+
+
 def days_to_expiry(expirations: pd.Series, now: datetime) -> pd.Series:
     """Calendar days from today to each expiry date (0 = expires today)."""
     days: pd.Series = (expirations.dt.normalize() - pd.Timestamp(now).normalize()).dt.days

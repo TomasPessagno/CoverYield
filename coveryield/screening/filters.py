@@ -76,21 +76,31 @@ def filter_calls(
 
 
 def add_contract_metrics(
-    df: pd.DataFrame, current_price: float, now: datetime | None = None
+    df: pd.DataFrame,
+    current_price: float,
+    now: datetime | None = None,
+    quoted_at: datetime | None = None,
 ) -> pd.DataFrame:
     """
     Add derived per-contract metrics to a frame produced by ``filter_calls``.
 
-    Days to Expiry (calendar days), Years to Expiry (to the 4pm close, the
-    Black-Scholes T), Annualized Return % (0 when expiry is today or past),
-    Distance to Strike %, Breakeven Price, Volume, Open Interest and IV (in percent).
-    ``now`` is New York wall time (see ``coveryield.market_time``).
+    Days to Expiry (calendar days from ``now``), Years to Expiry (the Black-Scholes
+    T: from ``quoted_at`` to the 4pm close on expiry day), Annualized Return % (0
+    when expiry is today or past), Distance to Strike %, Breakeven Price, Volume,
+    Open Interest and Yahoo IV (in percent).
+
+    ``quoted_at`` is when the prices were captured (defaults to ``now``). A quote
+    reflects the time left *when it was taken*, so pricing a stored snapshot needs
+    that moment: a 3-day-old quote on a 4-day option, priced as if it had 1 day
+    left, implies a wildly inflated volatility. Both are New York wall time (see
+    ``coveryield.market_time``).
     """
     out = df.copy()
     now = now or market_now()
+    quoted_at = quoted_at or now
 
     out["Days to Expiry"] = days_to_expiry(out["expirationDate"], now)
-    out["Years to Expiry"] = years_to_expiry(out["expirationDate"], now)
+    out["Years to Expiry"] = years_to_expiry(out["expirationDate"], quoted_at)
     dte = out["Days to Expiry"]
     out["Annualized Return %"] = (out["Static Return %"] * (365 / dte.where(dte > 0))).fillna(0.0)
 

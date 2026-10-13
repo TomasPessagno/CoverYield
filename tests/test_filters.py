@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 import pytest
@@ -126,3 +126,13 @@ def test_add_greeks_skips_quotes_no_volatility_can_explain(now: datetime) -> Non
     for column in GREEK_COLUMNS:
         assert out[column].iloc[0] is not None
         assert out[column].iloc[1:].isna().all()
+
+
+def test_stored_quotes_are_priced_from_when_they_were_taken(now: datetime) -> None:
+    # A quote captured 3 days ago on an option expiring in 4 days had 4 days left
+    # when it was priced; today's calendar still shows 4 days to expiry.
+    calls = make_calls([{"strike": 105, "days": 4}])
+    df = filter_calls("TEST", 100.0, calls, 0, 42, now=now)
+    row = add_contract_metrics(df, 100.0, now=now, quoted_at=now - timedelta(days=3)).iloc[0]
+    assert row["Days to Expiry"] == 4
+    assert row["Years to Expiry"] == pytest.approx((7 + 4 / 24) / 365)

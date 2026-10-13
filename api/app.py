@@ -35,7 +35,7 @@ from coveryield.data.service import ChainResult, ChainService
 from coveryield.data.store import ChainStore, MemoryStore, RedisStore
 from coveryield.data.universe import TICKER_MAP
 from coveryield.data.yahoo import YahooFinanceProvider
-from coveryield.market_time import market_now
+from coveryield.market_time import market_now, to_market_time
 from coveryield.pricing.black_scholes import DEFAULT_RISK_FREE_RATE
 from coveryield.screening.filters import (
     add_contract_metrics,
@@ -162,7 +162,9 @@ def _screener_response(
     df = filter_calls(symbol, chain.price, chain.calls, lo, hi, now=now)
     contracts: list[Contract] = []
     if not df.empty:
-        df = add_greeks(add_contract_metrics(df, chain.price, now=now), chain.price)
+        quoted_at = to_market_time(result.fetched_at)
+        df = add_contract_metrics(df, chain.price, now=now, quoted_at=quoted_at)
+        df = add_greeks(df, chain.price)
         contracts = [Contract(**_contract_fields(r)) for r in _records(df)]
     return ScreenerResponse(
         ticker=symbol,
@@ -260,7 +262,13 @@ def opportunities(req: OpportunitiesRequest, service: Service) -> OpportunitiesR
             result = service.get(t)
         except DataFetchError:
             continue
-        df = enrich_chain(result.chain, SCAN_MIN_DAYS, SCAN_MAX_DAYS, now=now)
+        df = enrich_chain(
+            result.chain,
+            SCAN_MIN_DAYS,
+            SCAN_MAX_DAYS,
+            now=now,
+            quoted_at=to_market_time(result.fetched_at),
+        )
         if not df.empty:
             frames.append(df)
             fetched_times.append(result.fetched_at)
